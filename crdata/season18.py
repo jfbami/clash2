@@ -2,8 +2,12 @@
 
 A Season 18 file stores the winning player in `winner.*` columns and the losing
 player in `loser.*` columns. Any model trained on that layout scores 100 percent
-from column position alone, so `load_season18` assigns sides at random and
-returns the resulting label.
+from column position alone, so every loader here assigns sides at random first
+and derives the label from the assignment.
+
+`load_randomised` does that work once. `as_difference_matrix` builds the sparse
+view used by linear models, and `as_index_arrays` builds the integer view used by
+embedding models.
 """
 from __future__ import annotations
 
@@ -18,16 +22,36 @@ CARDS_PER_DECK = 8
 
 
 @dataclass(frozen=True)
-class BattleMatrix:
-    """Model-ready view of a set of battles, with sides already randomised."""
+class RandomisedBattles:
+    """Battles with sides already assigned at random. Side A is not the winner."""
 
-    card_difference: sparse.csr_matrix
-    level_difference: np.ndarray
-    trophy_difference: np.ndarray
+    cards_a: np.ndarray
+    cards_b: np.ndarray
+    level_a: np.ndarray
+    level_b: np.ndarray
+    trophies_a: np.ndarray
+    trophies_b: np.ndarray
+    tag_a: np.ndarray
+    tag_b: np.ndarray
     side_a_won: np.ndarray
-    card_ids: np.ndarray
+
+    def __len__(self) -> int:
+        return len(self.side_a_won)
+
+
+@dataclass(frozen=True)
+class IndexArrays:
+    """Integer-encoded view for embedding models."""
+
+    cards_a: np.ndarray
+    cards_b: np.ndarray
     player_a: np.ndarray
     player_b: np.ndarray
+    level_a: np.ndarray
+    level_b: np.ndarray
+    side_a_won: np.ndarray
+    card_ids: np.ndarray
+    n_players: int
 
     def __len__(self) -> int:
         return len(self.side_a_won)
@@ -44,34 +68,13 @@ def _required_columns() -> list[str]:
         "winner.startingTrophies", "loser.startingTrophies"])
 
 
-def _swap_where(flip: np.ndarray, winner_values, loser_values):
-    """Return (side_a, side_b) after moving the loser to side A wherever flip."""
+def _swap_where(flip: np.ndarray, winner_values: np.ndarray, loser_values: np.ndarray):
     return np.where(flip, loser_values, winner_values), np.where(flip, winner_values, loser_values)
 
 
-def _card_difference_matrix(a_ids: np.ndarray, b_ids: np.ndarray,
-                            card_ids: np.ndarray) -> sparse.csr_matrix:
-    """Build a matrix holding +1 for a card on side A and -1 for a card on side B.
-
-    The difference encoding makes any linear model antisymmetric by construction:
-    swapping sides negates every feature and therefore negates the predicted logit.
-    """
-    column_of = {card: column for column, card in enumerate(card_ids)}
-    lookup = np.vectorize(column_of.get)
-    n_battles = len(a_ids)
-
-    rows = np.repeat(np.arange(n_battles), 2 * CARDS_PER_DECK)
-    columns = np.concatenate([lookup(a_ids), lookup(b_ids)], axis=1).ravel()
-    values = np.tile(
-        np.r_[np.ones(CARDS_PER_DECK), -np.ones(CARDS_PER_DECK)], n_battles)
-
-    return sparse.csr_matrix(
-        (values, (rows, columns)), shape=(n_battles, len(card_ids)), dtype=np.float32)
-
-
-def load_season18(path: Path | str, subsample: int | None = None,
-                  seed: int = 0) -> BattleMatrix:
-    """Load one Season 18 CSV, randomise sides, and return a BattleMatrix.
+def load_randomised(path: Path | str, subsample: int | None = None,
+                    seed: int = 0) -> RandomisedBattles:
+    """Read one Season 18 CSV, sort by time, and assign sides at random.
 
     Raises FileNotFoundError when `path` does not exist.
     """
@@ -84,30 +87,62 @@ def load_season18(path: Path | str, subsample: int | None = None,
     if subsample is not None:
         frame = frame.iloc[:subsample].reset_index(drop=True)
 
-    n_battles = len(frame)
-    flip = np.random.default_rng(seed).random(n_battles) < 0.5
-
+    flip = np.random.default_rng(seed).random(len(frame)) < 0.5
     winner_ids = frame[_deck_columns("winner")].to_numpy(np.int64)
     loser_ids = frame[_deck_columns("loser")].to_numpy(np.int64)
-    a_ids = np.where(flip[:, None], loser_ids, winner_ids)
-    b_ids = np.where(flip[:, None], winner_ids, loser_ids)
 
-    a_level, b_level = _swap_where(
-        flip, frame["winner.totalcard.level"].to_numpy(float),
-        frame["loser.totalcard.level"].to_numpy(float))
-    a_trophies, b_trophies = _swap_where(
-        flip, frame["winner.startingTrophies"].to_numpy(float),
-        frame["loser.startingTrophies"].to_numpy(float))
-    a_tag, b_tag = _swap_where(
+    level_a, level_b = _swap_where(
+        flip, frame["winner.totalcard.level"].to_numpy(np.float32),
+        frame["loser.totalcard.level"].to_numpy(np.float32))
+    trophies_a, trophies_b = _swap_where(
+        flip, frame["winner.startingTrophies"].to_numpy(np.float32),
+        frame["loser.startingTrophies"].to_numpy(np.float32))
+    tag_a, tag_b = _swap_where(
         flip, frame["winner.tag"].to_numpy(object), frame["loser.tag"].to_numpy(object))
 
-    card_ids = np.unique(np.concatenate([a_ids.ravel(), b_ids.ravel()]))
+    return RandomisedBattles(
+        cards_a=np.where(flip[:, None], loser_ids, winner_ids),
+        cards_b=np.where(flip[:, None], winner_ids, loser_ids),
+        level_a=level_a, level_b=level_b,
+        trophies_a=trophies_a, trophies_b=trophies_b,
+        tag_a=tag_a, tag_b=tag_b,
+        side_a_won=(~flip).astype(np.int8))
 
-    return BattleMatrix(
-        card_difference=_card_difference_matrix(a_ids, b_ids, card_ids),
-        level_difference=a_level - b_level,
-        trophy_difference=a_trophies - b_trophies,
-        side_a_won=(~flip).astype(np.int8),
-        card_ids=card_ids,
-        player_a=a_tag,
-        player_b=b_tag)
+
+def as_difference_matrix(battles: RandomisedBattles) -> tuple[sparse.csr_matrix, np.ndarray]:
+    """Build a matrix holding +1 for a card on side A and -1 for a card on side B.
+
+    The difference encoding makes any linear model antisymmetric by construction.
+    """
+    card_ids = np.unique(np.concatenate([battles.cards_a.ravel(), battles.cards_b.ravel()]))
+    column_of = {card: column for column, card in enumerate(card_ids)}
+    lookup = np.vectorize(column_of.get)
+    n_battles = len(battles)
+
+    rows = np.repeat(np.arange(n_battles), 2 * CARDS_PER_DECK)
+    columns = np.concatenate([lookup(battles.cards_a), lookup(battles.cards_b)], axis=1).ravel()
+    values = np.tile(np.r_[np.ones(CARDS_PER_DECK), -np.ones(CARDS_PER_DECK)], n_battles)
+
+    matrix = sparse.csr_matrix(
+        (values, (rows, columns)), shape=(n_battles, len(card_ids)), dtype=np.float32)
+    return matrix, card_ids
+
+
+def as_index_arrays(battles: RandomisedBattles) -> IndexArrays:
+    """Encode cards and players as contiguous integer indices for embedding lookup."""
+    card_ids = np.unique(np.concatenate([battles.cards_a.ravel(), battles.cards_b.ravel()]))
+    card_index = {card: position for position, card in enumerate(card_ids)}
+    to_card_index = np.vectorize(card_index.get)
+
+    players = np.unique(np.concatenate([battles.tag_a, battles.tag_b]))
+    player_index = {tag: position for position, tag in enumerate(players)}
+    to_player_index = np.vectorize(player_index.get)
+
+    return IndexArrays(
+        cards_a=to_card_index(battles.cards_a).astype(np.int64),
+        cards_b=to_card_index(battles.cards_b).astype(np.int64),
+        player_a=to_player_index(battles.tag_a).astype(np.int64),
+        player_b=to_player_index(battles.tag_b).astype(np.int64),
+        level_a=battles.level_a, level_b=battles.level_b,
+        side_a_won=battles.side_a_won,
+        card_ids=card_ids, n_players=len(players))
