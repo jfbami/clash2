@@ -45,6 +45,17 @@ Small functions doing one thing, intention-revealing names, no dead code, no com
 
 Fix lint errors, test failures, and flaky tests on sight, even when unrelated to the current task.
 
+## Read these before working
+
+`CONVENTIONS.md` carries terminology, architecture constraints, and how changes are explained.
+`DECISIONS.md` is an append-only log of what has been settled, with dates.
+A decision there is current only if no later entry supersedes it.
+`REJECTED.md` lists approaches already ruled out and why.
+Read `REJECTED.md` before proposing an approach, so a ruled-out idea is not raised again.
+
+Every settled decision gets an entry in `DECISIONS.md`.
+Every ruled-out approach gets an entry in `REJECTED.md`.
+
 ## Project state
 
 `README.md` covers the collector and how to run it.
