@@ -1,6 +1,6 @@
 # How much do card levels matter?
 
-![Win rate against card level advantage](figures/card_level_effect.png)
+![Win rate against card level advantage](../figures/card_level_effect.png)
 
 Data: 36,865,856 Season 18 ladder battles, 7 December 2020 to 3 January 2021.
 Built by `scripts/plot_card_level_effect.py`, counting logic in `crdata/level_effect.py`.

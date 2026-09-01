@@ -114,7 +114,7 @@ The archetype space is built from co-occurrence only.
 **Rejected 2026-08-24 by user instruction.**
 Running a fast approximation as a stand-in for the real thing is not acceptable in this project.
 
-Recorded in `CLAUDE.md`.
+Recorded in `../CLAUDE.md`.
 
 ## R11. Skip-gram instead of PMI plus SVD for the card space
 

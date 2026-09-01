@@ -1,6 +1,6 @@
 # Project conventions
 
-Read `CLAUDE.md` first for the working agreement.
+Read `../CLAUDE.md` first for the working agreement.
 Read `DECISIONS.md` for what has been settled and when.
 Read `REJECTED.md` before proposing an approach, so a ruled-out idea is not raised again.
 

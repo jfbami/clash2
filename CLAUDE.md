@@ -47,20 +47,20 @@ Fix lint errors, test failures, and flaky tests on sight, even when unrelated to
 
 ## Read these before working
 
-`CONVENTIONS.md` carries terminology, architecture constraints, and how changes are explained.
-`DECISIONS.md` is an append-only log of what has been settled, with dates.
+`docs/CONVENTIONS.md` carries terminology, architecture constraints, and how changes are explained.
+`docs/DECISIONS.md` is an append-only log of what has been settled, with dates.
 A decision there is current only if no later entry supersedes it.
-`REJECTED.md` lists approaches already ruled out and why.
-Read `REJECTED.md` before proposing an approach, so a ruled-out idea is not raised again.
+`docs/REJECTED.md` lists approaches already ruled out and why.
+Read `docs/REJECTED.md` before proposing an approach, so a ruled-out idea is not raised again.
 
-Every settled decision gets an entry in `DECISIONS.md`.
-Every ruled-out approach gets an entry in `REJECTED.md`.
+Every settled decision gets an entry in `docs/DECISIONS.md`.
+Every ruled-out approach gets an entry in `docs/REJECTED.md`.
 
 ## Project state
 
 `README.md` covers the collector and how to run it.
-`API_FINDINGS.md` records measured Clash Royale API behaviour.
-`ASSUMPTIONS.md` records ten identifying assumptions and which are testable.
-`RESULTS_BASELINE_LADDER.md` and `RESULTS_NEURAL.md` record findings.
+`docs/API_FINDINGS.md` records measured Clash Royale API behaviour.
+`docs/ASSUMPTIONS.md` records ten identifying assumptions and which are testable.
+`docs/RESULTS_BASELINE_LADDER.md` and `docs/RESULTS_NEURAL.md` record findings.
 
-Read `ASSUMPTIONS.md` before drawing any conclusion from the data.
+Read `docs/ASSUMPTIONS.md` before drawing any conclusion from the data.
