@@ -19,7 +19,7 @@ BATTLES = DATA / "battles"
 STATE = DATA / "state"
 REF = DATA / "reference"
 SEEN = STATE / "seen_keys.parquet"
-COHORT = STATE / "cohort.parquet"
+COHORT = STATE / "cohort_spread.parquet"  # trophy-balanced; the war-clan seed is retired
 
 for d in (BATTLES, STATE, REF):
     d.mkdir(parents=True, exist_ok=True)
@@ -71,14 +71,15 @@ def load_battles(clean_only: bool = False) -> pd.DataFrame:
     return df[df.is_clean_1v1] if clean_only else df
 
 
-def load_cohort() -> pd.DataFrame:
-    if COHORT.exists():
-        return pd.read_parquet(COHORT)
+def load_cohort(path: Path = COHORT) -> pd.DataFrame:
+    """Read the cohort to poll. Defaults to the trophy-balanced cohort."""
+    if path.exists():
+        return pd.read_parquet(path)
     return pd.DataFrame(
         columns=["tag", "name", "clan_tag", "added_at", "last_polled",
                  "n_polls", "n_battles", "n_fail"]
     )
 
 
-def save_cohort(df: pd.DataFrame) -> None:
-    df.to_parquet(COHORT, index=False)
+def save_cohort(df: pd.DataFrame, path: Path = COHORT) -> None:
+    df.to_parquet(path, index=False)
