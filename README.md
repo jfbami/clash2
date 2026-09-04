@@ -8,17 +8,19 @@ this project attempts to: (measure aspects like skill) + create a recommendation
 
 ## How a battle is predicted
 
-Every battle is written as the log-odds that side A wins.
+`MatchupModel` in `crdata/neural.py` writes every battle as the log-odds that side A wins.
 Four heads add up on the log-odds scale, and each head flips sign on its own when the two players swap sides.
 
 $$
 \text{logit } P(A \text{ wins}) = \text{skill} + \text{investment} + \text{deck strength} + \text{counters}
 $$
 
-- **skill** is one number per player, in `MatchupModel.player_skill`.
-- **investment** is an odd function of the card level gap, in `MatchupModel.investment`.
-- **deck strength** is how good a deck is against the field, in `MatchupModel.strength_head`.
-- **counters** is how a deck fares against one specific other deck, in `MatchupModel.counter_term`.
+Both deck heads read a deck vector from `DeckEncoder`, which sum-pools card embeddings and then applies an MLP.
+
+- **skill** is one free number per player in `MatchupModel.player_skill`, entered as the gap between the two players.
+- **investment** is `MatchupModel.investment`, an `OddFunction` MLP of the card level gap, so level acts nonlinearly and still negates exactly.
+- **deck strength** is the transitive effect, one number `MatchupModel.strength_head` reads off the deck vector.
+- **counters** is the cyclic effect, the blade-chest antisymmetric bilinear form of Chen and Joachims (2016) in `MatchupModel.counter_term`.
 
 ## How a deck switch is predicted
 
