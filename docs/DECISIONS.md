@@ -101,3 +101,15 @@ This overrode a user instruction to choose from the spectrum and was flagged as 
 Neither is on the path to answering the research question.
 The PMI baseline already passes its validation, and 3D is presentation only.
 Revisit after the deck strength measurement exists.
+
+## 2026-09-04
+
+**D19. Build the first sequential-model slice as a next-switch example from live data.**
+Ten clean, chronological battles form the input and the eleventh battle supplies only a binary deck-switch target.
+The data contract keeps deck ids and card levels as separate 10 by 8 arrays and stores result, crown difference, prior switch, Jaccard switch magnitude, log time gap in hours, and trophies as battle features.
+The first row's transition features are zero because the battle before the chosen window is outside the model input.
+The first implementation uses RoyaleAPI data, then a Season 18 adapter must produce the same contract before historical pre-training is compared.
+
+**D20. Map card ids to deterministic vocabulary indices before embedding lookup.**
+The vocabulary sorts the outcome-blind reference card ids, assigns known cards indices starting at one, and reserves index zero for an unseen card.
+Vocabulary indices carry no numerical similarity and exist only to address rows in a future embedding table.
