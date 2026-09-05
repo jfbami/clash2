@@ -9,29 +9,100 @@ this project attempts to: (measure aspects like skill) + create a recommendation
 ## Architecture at a glance
 
 ```text
-card ids --------> trainable embeddings ---------+
-raw card levels -> rarity conversion -> z-score -+-> shared card MLP
-                                                     |
-                                      pool 8 cards into one deck vector
-                                                     |
-numeric battle features ----------------------------+-> one battle token
-                                                         |
-                                  10 chronological battle tokens -> GRU
-                                                                       |
-rolling player summary ------------------------------------------> player context
-                                                                       |
-                                                       next-switch head
-
-player context + old deck + candidate deck ----------> mastery-cost head
-player context + old deck + candidate deck ----------> adoption head
-old deck + candidate deck + likely opponents -> antisymmetric matchup model -> deck advantage
-
-deck advantage + mastery effect -> candidate value
-candidate value + adoption probability -> feasibility filter -> recommend candidate or Stay
++-------------------+
+| 10 recent battles |
++---------+---------+
+          |
+          v
++-------------------+
+| History encoder   |
++---------+---------+
+          |
+          v
++-------------------+       +--------------------------+
+| Player context    |       | Deck and matchup inputs  |
++---------+---------+       +-------------+------------+
+          |                               |
+          +---------------+---------------+
+                          |
+                          v
+              +--------------------------+
+              | Recommendation model     |
+              +------------+-------------+
+                           |
+                           v
+              +--------------------------+
+              | Recommend a deck or Stay |
+              +--------------------------+
 ```
 
-The card encoder is implemented through the shared card MLP.
-Deck pooling, the GRU, and the recommendation heads remain proposed.
+### Inside the history encoder
+
+```text
++----------------+       +----------------+
+| Card id        |       | Raw card level |
++-------+--------+       +-------+--------+
+        |                        |
+        v                        v
++----------------+       +----------------+
+| Card embedding |       | Rarity convert |
++-------+--------+       +-------+--------+
+        |                        |
+        |                        v
+        |                +----------------+
+        |                | Standardized   |
+        |                | level scalar   |
+        |                +-------+--------+
+        |                        |
+        +------------+-----------+
+                     |
+                     v
+             +-----------------+
+             | Concatenate     |
+             +--------+--------+
+                      |
+                      v
+             +-----------------+
+             | Shared card MLP |
+             +--------+--------+
+                      |
+                      v
+             +-----------------+
+             | Card vector     |
+             +--------+--------+
+                      |
+                      | repeat for 8 cards
+                      v
+             +-----------------+
+             | Deck pooling    |
+             +--------+--------+
+                      |
+                      v
+             +-----------------+       +-------------------------+
+             | Deck vector     |       | Numeric battle features |
+             +--------+--------+       +------------+------------+
+                      |                             |
+                      +-------------+---------------+
+                                    |
+                                    v
+                           +------------------+
+                           | One battle token |
+                           +--------+---------+
+                                    |
+                                    | repeat for 10 battles
+                                    v
+                           +------------------+
+                           | GRU              |
+                           +--------+---------+
+                                    |
+                                    v
+                           +------------------+
+                           | Player context   |
+                           +------------------+
+```
+
+The card feature path is implemented through the shared card MLP.
+Deck pooling, battle-token assembly, the GRU, and the recommendation model remain proposed.
 
 ## How a battle is predicted
 
