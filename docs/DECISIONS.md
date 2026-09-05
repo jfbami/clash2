@@ -113,3 +113,33 @@ The first implementation uses RoyaleAPI data, then a Season 18 adapter must prod
 **D20. Map card ids to deterministic vocabulary indices before embedding lookup.**
 The vocabulary sorts the outcome-blind reference card ids, assigns known cards indices starting at one, and reserves index zero for an unseen card.
 Vocabulary indices carry no numerical similarity and exist only to address rows in a future embedding table.
+
+## 2026-09-05
+
+**D21. Start the sequential card encoder with a trainable, normally initialized embedding table.**
+`crdata/card_encoder.py` maps vocabulary indices to vectors initialized independently with mean zero and standard deviation `1 / sqrt(embedding_dim)`.
+The initialization gives each row an expected squared Euclidean norm of one.
+The table is intended to learn jointly with the next-switch model, separate from the outcome-blind archetype space.
+Index zero represents an unknown card, not padding, and remains trainable when used.
+Embedding dimension is an explicit constructor argument; 24 remains an example rather than a validated choice.
+Card-level fusion, deck pooling, and GRU construction remain subsequent steps.
+
+**D22. Convert rarity-relative API levels before model standardization.**
+`crdata/card_levels.py` adds the documented rarity offset to every raw API level, producing the displayed level scale while preserving actual level differences.
+The collector retains raw API values, and conversion occurs only while preparing model inputs.
+An unknown card rarity is rejected because its correct offset cannot be inferred from the stored level alone.
+Training-set mean and standard deviation will be fitted on the converted levels in the next encoder step.
+
+**D23. Standardize displayed card levels with training-set statistics before concatenation.**
+`crdata/card_levels.py` fits the population mean and standard deviation using only converted training levels.
+Validation, test, and inference inputs reuse those fixed statistics.
+`crdata/card_encoder.py` appends the standardized level as one scalar to each card embedding, preserving the association between card identity and level.
+The concrete statistics remain unset until the player-level data split exists.
+Card pooling remains a subsequent decision.
+
+**D24. Use a two-dense-layer shared MLP for the first per-card transformation.**
+`crdata/card_encoder.py` maps each card's embedding-plus-level vector through `Linear(input_dim, hidden_dim)`, GELU, and `Linear(hidden_dim, hidden_dim)`.
+The same `CardMLP` parameters process every card in every battle.
+Xavier uniform initializes both dense weight matrices, and both bias vectors start at zero.
+The initial candidate dimensions are 25 inputs and 48 outputs when the embedding dimension is 24, but those dimensions remain validation hyperparameters.
+The next-switch loss will supervise this representation only after the full history model and training pipeline exist.

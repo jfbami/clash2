@@ -70,7 +70,10 @@ Sample: 4,970 decks from members of the top 12 clan-war clans.
 | tournament | 6 | 11 | 7.12 | 3 | 11 | 100.0 |
 
 The `friendly` and `tournament` battle types cap at level 11, which is tournament standard.
-The level 11 cap proves the Clash Royale API reports normalised levels wherever normalisation applies.
+The level 11 cap shows that these modes apply the tournament level cap.
+The API still reports card levels relative to each rarity's original starting level.
+Convert to the displayed scale by adding 0 for common, 2 for rare, 5 for epic, 8 for legendary, and 10 for champion cards.
+RoyaleAPI documents the same conversion in its [API card-level explanation](https://discuss.royaleapi.com/t/clash-royale-api-data-issues/30651).
 
 The `riverRacePvP` battle type, which is War Day, reaches level 16 with a p10 of 8.
 War Day battles are therefore not played at tournament-standard card levels.
