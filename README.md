@@ -6,6 +6,33 @@ And of whatever deck effect remains, can we measure how much better some decks a
 
 this project attempts to: (measure aspects like skill) + create a recommendation algorithm that decides when a player should switch decks based off their recent battle history and behavioural type, and which deck to switch to.
 
+## Architecture at a glance
+
+```text
+card ids --------> trainable embeddings ---------+
+raw card levels -> rarity conversion -> z-score -+-> shared card MLP
+                                                     |
+                                      pool 8 cards into one deck vector
+                                                     |
+numeric battle features ----------------------------+-> one battle token
+                                                         |
+                                  10 chronological battle tokens -> GRU
+                                                                       |
+rolling player summary ------------------------------------------> player context
+                                                                       |
+                                                       next-switch head
+
+player context + old deck + candidate deck ----------> mastery-cost head
+player context + old deck + candidate deck ----------> adoption head
+old deck + candidate deck + likely opponents -> antisymmetric matchup model -> deck advantage
+
+deck advantage + mastery effect -> candidate value
+candidate value + adoption probability -> feasibility filter -> recommend candidate or Stay
+```
+
+The card encoder is implemented through the shared card MLP.
+Deck pooling, the GRU, and the recommendation heads remain proposed.
+
 ## How a battle is predicted
 
 `MatchupModel` in `crdata/neural.py` writes every battle as the log-odds that side A wins.
