@@ -106,7 +106,7 @@ Deck pooling, battle-token assembly, the GRU, and the recommendation model remai
 
 ## How a battle is predicted
 
-`MatchupModel` in `crdata/neural.py` writes every battle as the log-odds that side A wins.
+`MatchupModel` in `crdata/models/matchup.py` writes every battle as the log-odds that side A wins.
 Four heads add up on the log-odds scale, and each head flips sign on its own when the two players swap sides.
 
 $$

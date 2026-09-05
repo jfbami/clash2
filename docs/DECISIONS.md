@@ -143,3 +143,9 @@ The same `CardMLP` parameters process every card in every battle.
 Xavier uniform initializes both dense weight matrices, and both bias vectors start at zero.
 The initial candidate dimensions are 25 inputs and 48 outputs when the embedding dimension is 24, but those dimensions remain validation hyperparameters.
 The next-switch loss will supervise this representation only after the full history model and training pipeline exist.
+
+**D25. Group neural model modules under `crdata/models`.**
+The card encoder moves to `crdata/models/card_encoder.py`.
+The vaguely named `crdata/neural.py` moves to `crdata/models/matchup.py`.
+No decoder package exists because the current architecture has no decoder.
+Collection and data-processing modules remain at the package root until their number justifies another layer of folders.

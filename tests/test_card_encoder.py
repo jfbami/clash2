@@ -4,7 +4,7 @@ import unittest
 
 import torch
 
-from crdata.card_encoder import CardEmbedding, CardFeatures, CardMLP
+from crdata.models.card_encoder import CardEmbedding, CardFeatures, CardMLP
 from crdata.vocabulary import CardVocabulary
 
 

@@ -1,6 +1,6 @@
 # Neural matchup model results
 
-Model: `crdata/neural.py`, trained by `scripts/train_matchup.py`.
+Model: `crdata/models/matchup.py`, trained by `scripts/train_matchup.py`.
 Data: `BattlesStaging_01042021_WL_tagged.csv`, 1,105,943 Season 18 ladder battles.
 Split: time-ordered, 75 percent train and 25 percent test.
 

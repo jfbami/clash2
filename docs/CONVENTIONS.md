@@ -25,7 +25,7 @@ Matchmaking equalises trophies before a battle, so within-match trophy variance 
 **Cyclic** deck effect means the advantage depends on the opposing deck.
 The cyclic part is what a Bradley-Terry or Elo model cannot represent.
 
-**Counter term** is the antisymmetric bilinear form in `crdata/neural.py`.
+**Counter term** is the antisymmetric bilinear form in `crdata/models/matchup.py`.
 It is the blade-chest model of Chen and Joachims (2016).
 
 **Baseline ladder** is the nested sequence of deliberately limited models in `RESULTS_BASELINE_LADDER.md`.
@@ -42,7 +42,7 @@ There is no definitive archetype list.
 
 **Antisymmetry is structural, never learned.**
 Swapping side A and side B must negate the predicted log-odds exactly.
-`crdata/neural.py` verifies this numerically rather than assuming it.
+`crdata/models/matchup.py` verifies this numerically rather than assuming it.
 Any new model term must negate under a side swap or it does not go in.
 
 **The archetype space must never see outcomes.**

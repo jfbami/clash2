@@ -19,7 +19,7 @@ import torch
 from sklearn.metrics import log_loss, roc_auc_score
 from torch import nn
 
-from crdata.neural import MatchupModel
+from crdata.models.matchup import MatchupModel
 from crdata.season18 import as_index_arrays, load_randomised
 
 SEASON18_CSV = Path(

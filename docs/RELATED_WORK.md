@@ -31,7 +31,7 @@ That is the same disqualifying gap recorded for the s1m0n38 dataset in `REJECTED
 **The unit is the deck, not the battle.**
 A deck win-rate is marginal across every opponent it faced and every player who used it.
 Player skill and account investment are therefore baked into the target variable rather than controlled for.
-Marginalising over opponents also removes the matchup structure that `MatchupModel.counter_term` in `crdata/neural.py` exists to measure.
+Marginalising over opponents also removes the matchup structure that `MatchupModel.counter_term` in `crdata/models/matchup.py` exists to measure.
 
 **Cite 0.2552 only with its caveat.**
 That figure is R-squared on aggregated deck win-rate.
@@ -60,7 +60,7 @@ The mechanism is representational: a linear model SHAP value collapses to a weig
 
 **Explains the four-fold swing recorded in `RESULTS_NEURAL.md`.**
 A linear model attributed 79.7 percent of explained variance to investment.
-The neural model in `crdata/neural.py` attributes 29.7 percent on the same data.
+The neural model in `crdata/models/matchup.py` attributes 29.7 percent on the same data.
 That gap is the documented phenomenon rather than a defect in either model.
 
 The paper proposes an Explanation Reliability Score, averaging pairwise attribution agreement across an ensemble of prediction-equivalent models, treating scores below 0.5 as unreliable.
@@ -98,7 +98,7 @@ NeurIPS 2017.
 Read depth: abstract.
 
 Sum-pooling followed by an MLP is the universal form for permutation-invariant set functions.
-That is exactly `DeckEncoder` in `crdata/neural.py`, so the architecture choice has a proof behind it rather than an intuition.
+That is exactly `DeckEncoder` in `crdata/models/matchup.py`, so the architecture choice has a proof behind it rather than an intuition.
 
 The universal approximation result requires a latent dimension of order N to the power D for multisets of D-dimensional vectors.
 That bound bears on whether `embed_dim=48` supplies enough capacity for 8-card decks.
@@ -108,7 +108,7 @@ That bound bears on whether `embed_dim=48` supplies enough capacity for 8-card d
 WSDM 2016.
 Read depth: abstract.
 
-The blade-chest model, implemented as `MatchupModel.counter_term` in `crdata/neural.py`.
+The blade-chest model, implemented as `MatchupModel.counter_term` in `crdata/models/matchup.py`.
 Represents each item with multiple vectors so intransitive matchups can be expressed, which a single strength scalar cannot.
 
 ---
@@ -149,7 +149,7 @@ DOTA2 outcomes are dominated by hero selection while League of Legends depends o
 
 **Names a component this project does not model.**
 Champion-specific expertise is player-loadout fit, which is neither pure skill nor pure deck.
-`MatchupModel` in `crdata/neural.py` has no equivalent player-deck interaction term.
+`MatchupModel` in `crdata/models/matchup.py` has no equivalent player-deck interaction term.
 
 ### Identifying and Clustering Counter Relationships of Team Compositions in PvP Games for Efficient Balance Analysis
 
