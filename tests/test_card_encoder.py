@@ -8,6 +8,7 @@ from crdata.models.card_encoder import (
     CardEmbedding,
     CardFeatures,
     CardMLP,
+    DeckMLP,
     SumDeckPool,
 )
 from crdata.vocabulary import CardVocabulary
@@ -84,6 +85,41 @@ class SumDeckPoolTests(unittest.TestCase):
     def test_pooling_rejects_incomplete_deck(self) -> None:
         with self.assertRaisesRegex(ValueError, "expected 8 cards"):
             SumDeckPool()(torch.randn(10, 7, 48))
+
+
+class DeckMLPTests(unittest.TestCase):
+    def test_transforms_pooled_decks_and_preserves_sequence_axes(self) -> None:
+        deck_mlp = DeckMLP(input_dim=48, hidden_dim=96, output_dim=48)
+        pooled_decks = torch.randn(2, 10, 48, requires_grad=True)
+
+        deck_vectors = deck_mlp(pooled_decks)
+        deck_vectors.square().mean().backward()
+
+        self.assertEqual(deck_vectors.shape, (2, 10, 48))
+        self.assertTrue(torch.isfinite(deck_vectors).all())
+        self.assertIsNotNone(pooled_decks.grad)
+        self.assertTrue(torch.isfinite(pooled_decks.grad).all())
+
+    def test_card_permutation_does_not_change_deck_vector(self) -> None:
+        pool = SumDeckPool()
+        deck_mlp = DeckMLP(input_dim=48, hidden_dim=96, output_dim=48)
+        card_vectors = torch.randn(2, 10, 8, 48)
+        permutation = torch.tensor([4, 0, 7, 2, 5, 1, 6, 3])
+
+        original = deck_mlp(pool(card_vectors))
+        reordered = deck_mlp(pool(card_vectors[:, :, permutation, :]))
+
+        torch.testing.assert_close(original, reordered)
+
+    def test_dense_layers_have_zero_biases(self) -> None:
+        deck_mlp = DeckMLP(input_dim=48, hidden_dim=96, output_dim=48)
+        dense_layers = [
+            layer for layer in deck_mlp.network if isinstance(layer, torch.nn.Linear)
+        ]
+
+        self.assertEqual(len(dense_layers), 2)
+        for layer in dense_layers:
+            torch.testing.assert_close(layer.bias, torch.zeros_like(layer.bias))
 
 
 if __name__ == "__main__":

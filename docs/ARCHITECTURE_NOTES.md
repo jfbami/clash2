@@ -84,6 +84,14 @@ Later ablations may remove or replace a field for the final encoder.
 Card identities should not be concatenated in slot order.
 The same eight cards must produce the same deck representation under every card permutation.
 
+### Deck set encoder
+
+The settled initial deck encoder follows the Deep Sets form `rho(sum(phi(card)))`.
+The shared card MLP `phi` transforms each card independently, and sum pooling combines the eight transformed vectors.
+The deck MLP `rho` then applies `Linear(48, 96)`, GELU, and `Linear(96, 48)` to the pooled vector.
+Rho can learn nonlinear combinations of aggregate card features without reintroducing card order.
+The identity function remains an ablation because the later battle-token or history network may be able to perform the same post-pooling transformation.
+
 ### Static or long-term context
 
 The short sequence does not have to relearn stable player behavior on every example.

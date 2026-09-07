@@ -1,4 +1,4 @@
-"""Trainable card identity embeddings for the battle-token encoder."""
+"""Permutation-invariant deck encoding for the battle-token encoder."""
 from __future__ import annotations
 
 from math import sqrt
@@ -102,3 +102,28 @@ class SumDeckPool(nn.Module):
                 f"expected {self.cards_per_deck} cards, received {card_vectors.shape[-2]}"
             )
         return card_vectors.sum(dim=-2)
+
+
+class DeckMLP(nn.Module):
+    """Apply the deck-level rho network after permutation-invariant pooling."""
+
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int) -> None:
+        super().__init__()
+        if input_dim < 1 or hidden_dim < 1 or output_dim < 1:
+            raise ValueError("input_dim, hidden_dim, and output_dim must be positive")
+        self.network = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, output_dim),
+        )
+        self._initialize_weights()
+
+    def _initialize_weights(self) -> None:
+        for layer in self.network:
+            if isinstance(layer, nn.Linear):
+                nn.init.xavier_uniform_(layer.weight)
+                nn.init.zeros_(layer.bias)
+
+    def forward(self, pooled_deck: Tensor) -> Tensor:
+        """Transform the pooled feature axis while preserving leading axes."""
+        return self.network(pooled_deck)

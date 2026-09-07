@@ -156,3 +156,10 @@ Collection and data-processing modules remain at the package root until their nu
 `SumDeckPool` in `crdata/models/card_encoder.py` sums across the card axis and preserves the learned feature axis.
 The operation is permutation invariant, allows every card to contribute to every deck feature, and matches the Deep Sets baseline.
 Max pooling remains a later ablation rather than the initial pooling rule.
+
+**D27. Apply a two-layer deck MLP after sum pooling.**
+`DeckMLP` is the Deep Sets rho function and maps the pooled deck vector through `Linear(input_dim, hidden_dim)`, GELU, and `Linear(hidden_dim, output_dim)`.
+The initial candidate dimensions are 48 inputs, 96 hidden units, and 48 outputs.
+Xavier uniform initializes both dense weight matrices, and both bias vectors start at zero.
+The network operates only after permutation-invariant pooling, so it cannot reintroduce card order.
+An identity rho remains the required ablation because later nonlinear components may make the dedicated deck MLP redundant.
