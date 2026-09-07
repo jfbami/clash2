@@ -82,3 +82,23 @@ class CardMLP(nn.Module):
     def forward(self, card_features: Tensor) -> Tensor:
         """Transform the final feature axis while preserving all leading axes."""
         return self.network(card_features)
+
+
+class SumDeckPool(nn.Module):
+    """Sum eight card vectors into one permutation-invariant deck vector."""
+
+    def __init__(self, cards_per_deck: int = 8) -> None:
+        super().__init__()
+        if cards_per_deck < 1:
+            raise ValueError("cards_per_deck must be positive")
+        self.cards_per_deck = cards_per_deck
+
+    def forward(self, card_vectors: Tensor) -> Tensor:
+        """Remove the penultimate card axis and preserve the feature axis."""
+        if card_vectors.ndim < 2:
+            raise ValueError("card_vectors must include card and feature axes")
+        if card_vectors.shape[-2] != self.cards_per_deck:
+            raise ValueError(
+                f"expected {self.cards_per_deck} cards, received {card_vectors.shape[-2]}"
+            )
+        return card_vectors.sum(dim=-2)

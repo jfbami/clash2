@@ -149,3 +149,10 @@ The card encoder moves to `crdata/models/card_encoder.py`.
 The vaguely named `crdata/neural.py` moves to `crdata/models/matchup.py`.
 No decoder package exists because the current architecture has no decoder.
 Collection and data-processing modules remain at the package root until their number justifies another layer of folders.
+
+## 2026-09-07
+
+**D26. Sum-pool the eight transformed card vectors.**
+`SumDeckPool` in `crdata/models/card_encoder.py` sums across the card axis and preserves the learned feature axis.
+The operation is permutation invariant, allows every card to contribute to every deck feature, and matches the Deep Sets baseline.
+Max pooling remains a later ablation rather than the initial pooling rule.

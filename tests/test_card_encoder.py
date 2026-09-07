@@ -4,7 +4,12 @@ import unittest
 
 import torch
 
-from crdata.models.card_encoder import CardEmbedding, CardFeatures, CardMLP
+from crdata.models.card_encoder import (
+    CardEmbedding,
+    CardFeatures,
+    CardMLP,
+    SumDeckPool,
+)
 from crdata.vocabulary import CardVocabulary
 
 
@@ -62,6 +67,23 @@ class CardMLPTests(unittest.TestCase):
         self.assertTrue(torch.isfinite(transformed).all())
         self.assertIsNotNone(card_features.grad)
         self.assertTrue(torch.isfinite(card_features.grad).all())
+
+
+class SumDeckPoolTests(unittest.TestCase):
+    def test_pooling_is_permutation_invariant(self) -> None:
+        pool = SumDeckPool()
+        card_vectors = torch.randn(2, 10, 8, 48)
+        permutation = torch.tensor([4, 0, 7, 2, 5, 1, 6, 3])
+
+        original = pool(card_vectors)
+        reordered = pool(card_vectors[:, :, permutation, :])
+
+        self.assertEqual(original.shape, (2, 10, 48))
+        torch.testing.assert_close(original, reordered)
+
+    def test_pooling_rejects_incomplete_deck(self) -> None:
+        with self.assertRaisesRegex(ValueError, "expected 8 cards"):
+            SumDeckPool()(torch.randn(10, 7, 48))
 
 
 if __name__ == "__main__":

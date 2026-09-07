@@ -101,8 +101,8 @@ this project attempts to: (measure aspects like skill) + create a recommendation
                            +------------------+
 ```
 
-The card feature path is implemented through the shared card MLP.
-Deck pooling, battle-token assembly, the GRU, and the recommendation model remain proposed.
+The card feature path and sum deck pooling are implemented.
+Battle-token assembly, the GRU, and the recommendation model remain proposed.
 
 ## How a battle is predicted
 
