@@ -78,8 +78,13 @@ this project attempts to: (measure aspects like skill) + create a recommendation
              +--------+--------+
                       |
                       v
+             +-----------------+
+             | Deck MLP rho    |
+             +--------+--------+
+                      |
+                      v
              +-----------------+       +-------------------------+
-             | Deck vector     |       | Numeric battle features |
+             | Deck vector     |       | Preprocessed features   |
              +--------+--------+       +------------+------------+
                       |                             |
                       +-------------+---------------+
@@ -101,8 +106,8 @@ this project attempts to: (measure aspects like skill) + create a recommendation
                            +------------------+
 ```
 
-The card feature path and sum deck pooling are implemented.
-Battle-token assembly, the GRU, and the recommendation model remain proposed.
+The card feature path, deck encoder, and battle-token assembly are implemented.
+The GRU and recommendation model remain proposed.
 
 ## How a battle is predicted
 

@@ -92,6 +92,12 @@ The deck MLP `rho` then applies `Linear(48, 96)`, GELU, and `Linear(96, 48)` to 
 Rho can learn nonlinear combinations of aggregate card features without reintroducing card order.
 The identity function remains an ablation because the later battle-token or history network may be able to perform the same post-pooling transformation.
 
+The initial battle token directly concatenates that 48-dimensional deck vector with seven scalar features.
+Result and prior deck change retain their original binary encodings.
+Crown difference, switch magnitude, logged time gap, and trophies use training-only z-score statistics.
+Missing trophies are mean-imputed and identified by a seventh scalar missingness flag.
+The resulting 55-dimensional token goes directly to the history encoder without a separate token MLP.
+
 ### Static or long-term context
 
 The short sequence does not have to relearn stable player behavior on every example.

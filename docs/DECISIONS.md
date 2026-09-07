@@ -163,3 +163,14 @@ The initial candidate dimensions are 48 inputs, 96 hidden units, and 48 outputs.
 Xavier uniform initializes both dense weight matrices, and both bias vectors start at zero.
 The network operates only after permutation-invariant pooling, so it cannot reintroduce card order.
 An identity rho remains the required ablation because later nonlinear components may make the dedicated deck MLP redundant.
+
+**D28. Standardize only continuous battle features using training data.**
+Crown difference, switch magnitude, logged time gap, and trophies use z-score standardization fitted only on observed training values.
+Result remains encoded as minus one or plus one, and prior deck change remains zero or one.
+Missing trophies are imputed to the training mean, which becomes zero after standardization, and receive a separate binary missingness indicator.
+Validation, test, and inference data reuse the fitted training statistics.
+
+**D29. Form battle tokens by direct concatenation without a token MLP.**
+The initial battle token concatenates the 48-dimensional deck vector with the seven preprocessed battle features, producing 55 dimensions per battle.
+The GRU will receive these tokens directly and can learn nonlinear within-battle combinations through its input transformations and gates.
+A separate token MLP remains an ablation rather than part of the initial baseline.
