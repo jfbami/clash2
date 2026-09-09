@@ -133,12 +133,19 @@ It is not a cheap substitute for the full model and must use the same train, val
 
 ### GRU baseline
 
-A GRU updates one hidden state after each battle and returns the final state as player context.
-It is compact, naturally supports variable-length histories, and is the closest replication of the paper.
+`GRUHistoryEncoder` in `crdata/models/history_encoder.py` updates one 64-dimensional hidden state after each battle and returns the final state as recent player context.
+The initial encoder uses one forward layer because the input already contains nonlinear card and deck representations and the history contains only ten events.
+Each input-to-hidden gate matrix uses Xavier uniform initialization, and each recurrent gate matrix uses orthogonal initialization.
+Both GRU bias vectors start at zero.
+
+`NextSwitchHead` concatenates the 64-dimensional final state with the standardized eight-dimensional expanding-prefix summary.
+The resulting 72 values pass through `Linear(72, 64)`, GELU, dropout with probability 0.1, and `Linear(64, 1)` to produce one logit.
+Dropout follows the head activation rather than the recurrent state or raw summary inputs.
+PyTorch's built-in GRU dropout remains zero because it has no effect with one recurrent layer.
 
 A bidirectional GRU is valid when it only processes a completed past window because every event in that window is already known at decision time.
 A causal single-direction GRU is easier to cache and update online.
-Both should be compared if online state reuse matters.
+Hidden widths 32, 64, and 128, one against two recurrent layers, dropout probabilities 0, 0.1, and 0.2, and forward against bidirectional processing remain required comparisons.
 
 ### Temporal convolutional network
 

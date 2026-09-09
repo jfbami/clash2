@@ -186,3 +186,13 @@ Opportunity counts expose how much evidence supports each conditional rate witho
 Every summary column uses z-score statistics fitted only on training players and reused for validation, test, and inference.
 The summary will join the final forward-GRU state before the next-switch head rather than being repeated at every timestep.
 A fixed rolling summary window remains an ablation for behavioral drift.
+
+**D31. Start the history model with one 64-dimensional forward GRU layer.**
+`GRUHistoryEncoder` in `crdata/models/history_encoder.py` reads the ten 55-dimensional battle tokens and returns the final hidden state.
+Each input-to-hidden gate matrix uses Xavier uniform initialization, and each hidden-to-hidden gate matrix uses orthogonal initialization.
+Both GRU bias vectors and the initial hidden state start at zero.
+The built-in GRU dropout remains zero because PyTorch applies it only between recurrent layers.
+`NextSwitchHead` concatenates the 64-dimensional history state with the eight-dimensional standardized summary.
+The 72-dimensional fused vector passes through `Linear(72, 64)`, GELU, dropout with probability 0.1, and `Linear(64, 1)`.
+The head returns one logit for binary cross-entropy with logits.
+Hidden widths 32 and 128, a two-layer GRU, dropout probabilities 0 and 0.2, a bidirectional GRU, and a linear fusion head remain required ablations.

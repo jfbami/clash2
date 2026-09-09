@@ -164,6 +164,23 @@ class SequenceExampleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicate battle keys"):
             build_sequence_example(battles)
 
+    def test_invalid_result_is_rejected(self) -> None:
+        deck = tuple(range(1, 9))
+        battles = [battle(position, deck) for position in range(11)]
+        battles[3] = PlayerBattle(
+            battle_key=battles[3].battle_key,
+            battle_time=battles[3].battle_time,
+            player_tag=PLAYER,
+            deck_ids=deck,
+            card_levels=battles[3].card_levels,
+            result=0,
+            crown_difference=0,
+            trophies=battles[3].trophies,
+        )
+
+        with self.assertRaisesRegex(ValueError, "minus one or plus one"):
+            build_sequence_example(battles)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -142,6 +142,8 @@ def _ordered_player_battles(battles: Iterable[PlayerBattle]) -> list[PlayerBattl
         raise ValueError("duplicate battle keys must be removed before building a sequence")
     if len({battle.player_tag for battle in ordered}) != 1:
         raise ValueError("all battles in one sequence must belong to the same player")
+    if any(battle.result not in (-1, 1) for battle in ordered):
+        raise ValueError("battle results must be minus one or plus one")
     return ordered
 
 

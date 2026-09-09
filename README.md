@@ -101,13 +101,25 @@ this project attempts to: (measure aspects like skill) + create a recommendation
                            +--------+---------+
                                     |
                                     v
-                           +------------------+
-                           | Player context   |
-                           +------------------+
+                           +------------------+       +--------------------+
+                           | Recent context   |       | Player summary     |
+                           +--------+---------+       +---------+----------+
+                                    |                           |
+                                    +-------------+-------------+
+                                                  |
+                                                  v
+                                         +------------------+
+                                         | Switch head      |
+                                         +--------+---------+
+                                                  |
+                                                  v
+                                         +------------------+
+                                         | Switch logit     |
+                                         +------------------+
 ```
 
-The card feature path, deck encoder, battle-token assembly, and expanding-prefix behavioral summaries are implemented.
-The GRU and recommendation model remain proposed.
+The card feature path, deck encoder, battle-token assembly, expanding-prefix behavioral summaries, forward GRU, and next-switch head are implemented.
+The training pipeline and later recommendation stages remain proposed.
 
 ## How a battle is predicted
 
