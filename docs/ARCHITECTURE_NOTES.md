@@ -101,10 +101,13 @@ The resulting 55-dimensional token goes directly to the history encoder without 
 ### Static or long-term context
 
 The short sequence does not have to relearn stable player behavior on every example.
-A separate summary branch can provide switch rate, loss reactivity, switch drift, prior deck experience, trophy band, and other leakage-safe aggregates computed strictly before time $t$.
+`crdata/sequences.py` now supplies an expanding-prefix summary of switching propensity, loss-conditioned and win-conditioned switching, switch magnitude, current deck tenure, history size, and conditional-rate support.
+`crdata/summary_features.py` mean-imputes undefined statistics and standardizes every column using training players only.
+The summary joins the final GRU state before the next-switch head and is not repeated at every timestep.
 
 The full-season behavioral subtype cannot be used as an online feature without acknowledging that it contains future behavior.
 A deployment-faithful experiment needs a rolling or training-period-only subtype.
+A fixed rolling summary remains an ablation because it may track behavioral drift better than the expanding prefix.
 
 ### Sequence length
 

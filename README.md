@@ -106,7 +106,7 @@ this project attempts to: (measure aspects like skill) + create a recommendation
                            +------------------+
 ```
 
-The card feature path, deck encoder, and battle-token assembly are implemented.
+The card feature path, deck encoder, battle-token assembly, and expanding-prefix behavioral summaries are implemented.
 The GRU and recommendation model remain proposed.
 
 ## How a battle is predicted

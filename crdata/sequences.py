@@ -26,6 +26,16 @@ FEATURE_NAMES = (
     "log1p_time_gap_hours",
     "trophies",
 )
+SUMMARY_FEATURE_NAMES = (
+    "historical_switch_rate",
+    "post_loss_switch_rate",
+    "post_win_switch_rate",
+    "mean_switch_magnitude",
+    "log1p_current_deck_tenure",
+    "log1p_prior_battle_count",
+    "log1p_post_loss_opportunities",
+    "log1p_post_win_opportunities",
+)
 
 
 @dataclass(frozen=True)
@@ -49,6 +59,7 @@ class SequenceExample:
     deck_ids: np.ndarray
     card_levels: np.ndarray
     battle_features: np.ndarray
+    summary_features: np.ndarray
     next_switch: np.int8
     player_tag: str
     history_times: tuple[datetime, ...]
@@ -58,6 +69,10 @@ class SequenceExample:
     @property
     def feature_names(self) -> tuple[str, ...]:
         return FEATURE_NAMES
+
+    @property
+    def summary_feature_names(self) -> tuple[str, ...]:
+        return SUMMARY_FEATURE_NAMES
 
 
 def jaccard_distance(deck_a: Sequence[int], deck_b: Sequence[int]) -> float:
@@ -167,6 +182,56 @@ def _feature_matrix(history: Sequence[PlayerBattle]) -> np.ndarray:
     return np.asarray(rows, dtype=np.float32)
 
 
+def _rate(numerator: int, denominator: int) -> float:
+    return float(numerator / denominator) if denominator else float("nan")
+
+
+def _current_deck_tenure(history: Sequence[PlayerBattle]) -> int:
+    current_deck = history[-1].deck_ids
+    tenure = 0
+    for battle in reversed(history):
+        if battle.deck_ids != current_deck:
+            break
+        tenure += 1
+    return tenure
+
+
+def _summary_features(prior_battles: Sequence[PlayerBattle]) -> np.ndarray:
+    switch_count = 0
+    switch_magnitudes = []
+    post_loss_opportunities = 0
+    post_loss_switches = 0
+    post_win_opportunities = 0
+    post_win_switches = 0
+
+    for previous, current in zip(prior_battles, prior_battles[1:]):
+        switched = previous.deck_ids != current.deck_ids
+        switch_count += int(switched)
+        if switched:
+            switch_magnitudes.append(jaccard_distance(previous.deck_ids, current.deck_ids))
+        if previous.result == -1:
+            post_loss_opportunities += 1
+            post_loss_switches += int(switched)
+        else:
+            post_win_opportunities += 1
+            post_win_switches += int(switched)
+
+    transition_count = len(prior_battles) - 1
+    mean_switch_magnitude = (
+        float(np.mean(switch_magnitudes)) if switch_magnitudes else float("nan")
+    )
+    return np.asarray([
+        _rate(switch_count, transition_count),
+        _rate(post_loss_switches, post_loss_opportunities),
+        _rate(post_win_switches, post_win_opportunities),
+        mean_switch_magnitude,
+        log1p(_current_deck_tenure(prior_battles)),
+        log1p(len(prior_battles)),
+        log1p(post_loss_opportunities),
+        log1p(post_win_opportunities),
+    ], dtype=np.float32)
+
+
 def build_sequence_example(
     battles: Iterable[PlayerBattle],
     history_length: int = DEFAULT_HISTORY_LENGTH,
@@ -181,10 +246,12 @@ def build_sequence_example(
     _validate_window(history_length, window_start, len(ordered))
     history = ordered[window_start:window_start + history_length]
     target = ordered[window_start + history_length]
+    prior_battles = ordered[:window_start + history_length]
     return SequenceExample(
         deck_ids=np.asarray([battle.deck_ids for battle in history], dtype=np.int64),
         card_levels=np.asarray([battle.card_levels for battle in history], dtype=np.float32),
         battle_features=_feature_matrix(history),
+        summary_features=_summary_features(prior_battles),
         next_switch=np.int8(target.deck_ids != history[-1].deck_ids),
         player_tag=history[0].player_tag,
         history_times=tuple(battle.battle_time for battle in history),

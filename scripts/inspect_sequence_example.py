@@ -90,6 +90,10 @@ def print_example(example, vocabulary) -> None:
     print(f"card_levels shape: {example.card_levels.shape}")
     print(f"battle_features shape: {example.battle_features.shape}")
     print(f"feature order: {', '.join(example.feature_names)}")
+    print(f"summary_features shape: {example.summary_features.shape}")
+    print("summary features:")
+    for name, value in zip(example.summary_feature_names, example.summary_features):
+        print(f"  {name}: {value:.4g}")
     print()
 
     for position, battle_time in enumerate(example.history_times):

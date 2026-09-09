@@ -7,6 +7,7 @@ import numpy as np
 
 from crdata.sequences import (
     FEATURE_NAMES,
+    SUMMARY_FEATURE_NAMES,
     PlayerBattle,
     build_sequence_example,
     jaccard_distance,
@@ -43,10 +44,65 @@ class SequenceExampleTests(unittest.TestCase):
         self.assertEqual(example.deck_ids.shape, (10, 8))
         self.assertEqual(example.card_levels.shape, (10, 8))
         self.assertEqual(example.battle_features.shape, (10, len(FEATURE_NAMES)))
+        self.assertEqual(example.summary_features.shape, (len(SUMMARY_FEATURE_NAMES),))
         self.assertEqual(int(example.next_switch), 1)
         np.testing.assert_array_equal(example.deck_ids[-1], original)
         self.assertEqual(example.target_deck_ids, changed)
         self.assertNotIn(changed[-1], example.deck_ids)
+
+    def test_summary_features_use_the_expanding_pre_target_prefix(self) -> None:
+        deck_a = tuple(range(1, 9))
+        deck_b = tuple(range(2, 10))
+        deck_c = tuple(range(3, 11))
+        decks = [deck_a, deck_a, deck_b, deck_b] + [deck_c] * 7
+        battles = [battle(position, deck) for position, deck in enumerate(decks)]
+
+        example = build_sequence_example(battles, history_length=5, window_start=5)
+        summary = dict(zip(SUMMARY_FEATURE_NAMES, example.summary_features))
+
+        self.assertAlmostEqual(float(summary["historical_switch_rate"]), 2.0 / 9.0)
+        self.assertAlmostEqual(float(summary["post_loss_switch_rate"]), 0.5)
+        self.assertEqual(float(summary["post_win_switch_rate"]), 0.0)
+        self.assertAlmostEqual(
+            float(summary["mean_switch_magnitude"]),
+            jaccard_distance(deck_a, deck_b),
+        )
+        self.assertAlmostEqual(
+            float(summary["log1p_current_deck_tenure"]), np.log(7.0), places=6
+        )
+        self.assertAlmostEqual(
+            float(summary["log1p_prior_battle_count"]), np.log(11.0), places=6
+        )
+        self.assertAlmostEqual(
+            float(summary["log1p_post_loss_opportunities"]), np.log(5.0), places=6
+        )
+        self.assertAlmostEqual(
+            float(summary["log1p_post_win_opportunities"]), np.log(6.0), places=6
+        )
+
+    def test_undefined_summary_rates_remain_missing_until_preprocessing(self) -> None:
+        deck = tuple(range(1, 9))
+        battles = [battle(position, deck) for position in range(11)]
+        battles = [
+            PlayerBattle(
+                battle_key=item.battle_key,
+                battle_time=item.battle_time,
+                player_tag=item.player_tag,
+                deck_ids=item.deck_ids,
+                card_levels=item.card_levels,
+                result=1,
+                crown_difference=item.crown_difference,
+                trophies=item.trophies,
+            )
+            for item in battles
+        ]
+
+        example = build_sequence_example(battles)
+        summary = dict(zip(SUMMARY_FEATURE_NAMES, example.summary_features))
+
+        self.assertTrue(np.isnan(summary["post_loss_switch_rate"]))
+        self.assertTrue(np.isnan(summary["mean_switch_magnitude"]))
+        self.assertEqual(float(summary["log1p_post_loss_opportunities"]), 0.0)
 
     def test_transition_features_use_only_history_battles(self) -> None:
         original = tuple(range(1, 9))

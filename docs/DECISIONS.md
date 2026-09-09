@@ -174,3 +174,15 @@ Validation, test, and inference data reuse the fitted training statistics.
 The initial battle token concatenates the 48-dimensional deck vector with the seven preprocessed battle features, producing 55 dimensions per battle.
 The GRU will receive these tokens directly and can learn nonlinear within-battle combinations through its input transformations and gates.
 A separate token MLP remains an ablation rather than part of the initial baseline.
+
+## 2026-09-08
+
+**D30. Add an expanding-prefix behavioral summary beside the local GRU sequence.**
+`crdata/sequences.py` computes eight causal summary features from every observed battle strictly before the target.
+The summary contains historical switch rate, post-loss switch rate, post-win switch rate, mean switch magnitude, current deck tenure, prior battle count, post-loss opportunities, and post-win opportunities.
+Counts and tenure use `log1p` before standardization.
+Undefined conditional rates and mean switch magnitude remain missing until `crdata/summary_features.py` imputes them to training-set means.
+Opportunity counts expose how much evidence supports each conditional rate without adding redundant missingness flags.
+Every summary column uses z-score statistics fitted only on training players and reused for validation, test, and inference.
+The summary will join the final forward-GRU state before the next-switch head rather than being repeated at every timestep.
+A fixed rolling summary window remains an ablation for behavioral drift.
