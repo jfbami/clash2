@@ -1,6 +1,5 @@
 # Project conventions
 
-Read `../CLAUDE.md` first for the working agreement.
 Read `DECISIONS.md` for what has been settled and when.
 Read `REJECTED.md` before proposing an approach, so a ruled-out idea is not raised again.
 
@@ -84,12 +83,12 @@ If a previously reported number was wrong, state the old value, the new value, a
 ## How decisions get made
 
 The user decides the research question, all modelling decisions, and the prose.
-Claude lays out options with tradeoffs and waits.
+Modeling choices are proposed with tradeoffs and require user approval before implementation.
 
 Every settled decision goes in `DECISIONS.md` with a date.
 Every ruled-out approach goes in `REJECTED.md` with the reason it was ruled out.
 
-A decision is not settled because Claude made it while building something.
+A decision is not settled merely because it was used while building something.
 Surface those explicitly so they can be reversed.
 
 ## Verification expectations
