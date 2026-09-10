@@ -1,6 +1,6 @@
 """Train the neural matchup model on a Season 18 ladder file.
 
-Usage:  python scripts/train_matchup.py [--subsample N] [--epochs N]
+Usage:  python scripts/train_matchup.py --input PATH [--subsample N] [--epochs N]
 
 Reports test accuracy, AUC and log loss, then decomposes the predicted log-odds
 into skill, investment, deck strength and counters.
@@ -21,13 +21,6 @@ from torch import nn
 
 from crdata.models.matchup import MatchupModel
 from crdata.season18 import as_index_arrays, load_randomised
-
-SEASON18_CSV = Path(
-    r"C:\Users\jfbaa\AppData\Local\Temp\claude"
-    r"\C--Users-jfbaa-OneDrive-Documents-clash2"
-    r"\d24c6794-c5fc-463a-925a-588dd12c92e6\scratchpad\kaggle_sample"
-    r"\BattlesStaging_01042021_WL_tagged.csv")
-
 
 def to_tensors(data, rows: slice) -> dict[str, torch.Tensor]:
     return {
@@ -78,6 +71,8 @@ def report_decomposition(model: MatchupModel, batch: dict) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--input", type=Path, required=True,
+                        help="Season 18 battle CSV to train on")
     parser.add_argument("--subsample", type=int, default=400_000)
     parser.add_argument("--epochs", type=int, default=12)
     parser.add_argument("--batch-size", type=int, default=4096)
@@ -85,7 +80,7 @@ def main() -> int:
     arguments = parser.parse_args()
 
     print("loading ...")
-    battles = load_randomised(SEASON18_CSV, subsample=arguments.subsample)
+    battles = load_randomised(arguments.input, subsample=arguments.subsample)
     data = as_index_arrays(battles)
     n_battles = len(data)
     cut = int(n_battles * 0.75)

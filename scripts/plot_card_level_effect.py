@@ -1,6 +1,6 @@
 """Count and plot the win rate against card level advantage.
 
-Usage:  python scripts/plot_card_level_effect.py
+Usage:  python scripts/plot_card_level_effect.py --parquet-dir PATH
 
 Writes `figures/card_level_effect.png` and prints the numbers behind it.
 Nothing is fitted. Every point is a counted win rate.
@@ -29,9 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from crdata.level_effect import (CARDS_PER_DECK, Curve, LevelCounts, count_season,
                                  overall_win_rate, season_files, trophy_matched_win_rate)
 
-PARQUET = Path(r"C:\Users\jfbaa\AppData\Local\Temp\claude"
-               r"\C--Users-jfbaa-OneDrive-Documents-clash2"
-               r"\d24c6794-c5fc-463a-925a-588dd12c92e6\scratchpad\season18_parquet")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED = ("01042021",)  # D9: the final day of the season is not representative.
 PLOT_RANGE = 20  # in summed levels; the axis is drawn per card
 CURVE_COLOUR = "#c1440e"
@@ -113,14 +111,14 @@ def report(overall: Curve, matched: Curve) -> None:
               f"{100 * matched.at(advantage):>20.2f}%")
 
 
-def load_counts(cache: Path) -> LevelCounts:
+def load_counts(parquet_dir: Path, cache: Path) -> LevelCounts:
     """Count the season, or reuse a previous count so the plot can be redrawn."""
     if cache.exists():
         print(f"reusing counts from {cache}")
         stored = np.load(cache)
         return LevelCounts(battles=stored["battles"], wins=stored["wins"])
 
-    files = season_files(PARQUET, EXCLUDED)
+    files = season_files(parquet_dir, EXCLUDED)
     print(f"{len(files)} day files, excluding {EXCLUDED}\n", flush=True)
     counts = count_season(files)
     cache.parent.mkdir(parents=True, exist_ok=True)
@@ -130,20 +128,24 @@ def load_counts(cache: Path) -> LevelCounts:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--parquet-dir", type=Path, required=True,
+                        help="directory containing converted Season 18 Parquet files")
+    parser.add_argument("--cache", type=Path,
+                        default=PROJECT_ROOT / "data" / "card_level_counts.npz")
+    parser.add_argument("--output", type=Path,
+                        default=PROJECT_ROOT / "figures" / "card_level_effect.png")
     parser.add_argument("--recount", action="store_true",
                         help="ignore the cached counts and stream the season again")
     arguments = parser.parse_args()
 
-    root = Path(__file__).resolve().parents[1]
-    cache = root / "data" / "card_level_counts.npz"
-    if arguments.recount and cache.exists():
-        cache.unlink()
+    if arguments.recount and arguments.cache.exists():
+        arguments.cache.unlink()
 
-    counts = load_counts(cache)
+    counts = load_counts(arguments.parquet_dir, arguments.cache)
     overall = _visible(overall_win_rate(counts))
     report(overall, _visible(trophy_matched_win_rate(counts)))
 
-    draw(overall, counts, counts.total(), root / "figures" / "card_level_effect.png")
+    draw(overall, counts, counts.total(), arguments.output)
     return 0
 
 

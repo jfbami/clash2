@@ -1,10 +1,10 @@
 """Convert every extracted Season 18 CSV into Parquet.
 
-Usage:  python scripts/build_season18.py
+Usage:  python scripts/build_season18.py --source-dir PATH
 
-Reads the extracted CSVs from the scratchpad and writes one Parquet file per
-source into `season18_parquet/`. Safe to re-run: files already converted are
-skipped unless --force is given.
+Reads extracted CSVs from the requested source directory and writes one Parquet
+file per source into `data/season18_parquet/` by default. Safe to re-run: files
+already converted are skipped unless --force is given.
 """
 from __future__ import annotations
 
@@ -17,11 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from crdata.etl import convert_file
 
-SCRATCH = Path(r"C:\Users\jfbaa\AppData\Local\Temp\claude"
-               r"\C--Users-jfbaa-OneDrive-Documents-clash2"
-               r"\d24c6794-c5fc-463a-925a-588dd12c92e6\scratchpad")
-EXTRACTED = SCRATCH / "season18"
-PARQUET = SCRATCH / "season18_parquet"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def battle_files(root: Path) -> list[Path]:
@@ -32,20 +28,24 @@ def battle_files(root: Path) -> list[Path]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--source-dir", type=Path, required=True,
+                        help="directory containing extracted Season 18 CSV files")
+    parser.add_argument("--output-dir", type=Path,
+                        default=PROJECT_ROOT / "data" / "season18_parquet")
     parser.add_argument("--force", action="store_true", help="reconvert existing files")
     arguments = parser.parse_args()
 
-    sources = battle_files(EXTRACTED)
+    sources = battle_files(arguments.source_dir)
     if not sources:
-        print(f"No battle CSVs found under {EXTRACTED}")
+        print(f"No battle CSVs found under {arguments.source_dir}")
         return 1
 
-    PARQUET.mkdir(parents=True, exist_ok=True)
+    arguments.output_dir.mkdir(parents=True, exist_ok=True)
     print(f"{len(sources)} source files\n")
     total_written = 0
 
     for source in sources:
-        destination = PARQUET / (source.stem + ".parquet")
+        destination = arguments.output_dir / (source.stem + ".parquet")
         if destination.exists() and not arguments.force:
             print(f"  skip     {source.name}  (already converted)")
             continue
@@ -58,7 +58,7 @@ def main() -> int:
               f"{time.time() - started:5.0f}s  {source.name}")
 
     print(f"\ntotal rows written this run: {total_written:,}")
-    print(f"output: {PARQUET}")
+    print(f"output: {arguments.output_dir}")
     return 0
 
 

@@ -1,6 +1,6 @@
 """Verify the converted Season 18 Parquet before any modelling depends on it.
 
-Usage:  python scripts/verify_season18.py
+Usage:  python scripts/verify_season18.py --parquet-dir PATH
 
 Answers three questions:
   1. Are battles duplicated across day files?
@@ -10,6 +10,7 @@ Answers three questions:
 """
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -20,15 +21,12 @@ import pandas as pd
 
 from crdata.etl import season_files
 
-PARQUET = Path(r"C:\Users\jfbaa\AppData\Local\Temp\claude"
-               r"\C--Users-jfbaa-OneDrive-Documents-clash2"
-               r"\d24c6794-c5fc-463a-925a-588dd12c92e6\scratchpad\season18_parquet")
 FINAL_DAY = "01042021"
 
 
-def summarise_days() -> pd.DataFrame:
+def summarise_days(parquet_dir: Path) -> pd.DataFrame:
     rows = []
-    for path in season_files(PARQUET):
+    for path in season_files(parquet_dir):
         frame = pd.read_parquet(path, columns=["battle_time", "a_won"])
         rows.append({"file": path.stem.replace("_WL_tagged", ""),
                      "battles": len(frame),
@@ -37,9 +35,9 @@ def summarise_days() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def duplicate_count() -> tuple[int, int]:
+def duplicate_count(parquet_dir: Path) -> tuple[int, int]:
     keys = []
-    for path in season_files(PARQUET):
+    for path in season_files(parquet_dir):
         frame = pd.read_parquet(path, columns=["battle_time", "a_tag", "b_tag"])
         keys.append(frame.battle_time.astype("int64").astype(str)
                     + "|" + frame.a_tag.astype(str) + "|" + frame.b_tag.astype(str))
@@ -47,16 +45,16 @@ def duplicate_count() -> tuple[int, int]:
     return len(all_keys), int(all_keys.duplicated().sum())
 
 
-def battles_per_player() -> pd.Series:
+def battles_per_player(parquet_dir: Path) -> pd.Series:
     tags = []
-    for path in season_files(PARQUET):
+    for path in season_files(parquet_dir):
         frame = pd.read_parquet(path, columns=["a_tag", "b_tag"])
         tags.append(pd.concat([frame.a_tag.astype(str), frame.b_tag.astype(str)],
                               ignore_index=True))
     return pd.concat(tags, ignore_index=True).value_counts()
 
 
-def compare_final_day_to_midseason() -> None:
+def compare_final_day_to_midseason(parquet_dir: Path) -> None:
     level_columns = [f"a_level{i}" for i in range(1, 9)]
     wanted = level_columns + ["a_trophies", "a_card1"]
 
@@ -69,8 +67,8 @@ def compare_final_day_to_midseason() -> None:
                 "mean trophies": float(frame.a_trophies.mean()),
                 "distinct cards in slot 1": int(frame.a_card1.nunique())}
 
-    final = [p for p in season_files(PARQUET) if FINAL_DAY in p.name]
-    mid = [p for p in season_files(PARQUET) if FINAL_DAY not in p.name]
+    final = [p for p in season_files(parquet_dir) if FINAL_DAY in p.name]
+    mid = [p for p in season_files(parquet_dir) if FINAL_DAY not in p.name]
     print(f"\n{'metric':28s} {'final day':>14s} {'mid-season':>14s} {'difference':>12s}")
     print("-" * 72)
     final_profile, mid_profile = profile(final), profile(mid)
@@ -83,19 +81,24 @@ def compare_final_day_to_midseason() -> None:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--parquet-dir", type=Path, required=True,
+                        help="directory containing converted Season 18 Parquet files")
+    arguments = parser.parse_args()
+
     print("=" * 72)
     print("SEASON 18 VERIFICATION")
     print("=" * 72)
 
-    days = summarise_days()
+    days = summarise_days(arguments.parquet_dir)
     print(days.to_string(index=False))
     print(f"\ntotal battles: {days.battles.sum():,}")
 
-    total, duplicates = duplicate_count()
+    total, duplicates = duplicate_count(arguments.parquet_dir)
     print(f"\nduplicate battles across day files: {duplicates:,} of {total:,} "
           f"({100 * duplicates / total:.3f} percent)")
 
-    counts = battles_per_player()
+    counts = battles_per_player(arguments.parquet_dir)
     print(f"\nBATTLES PER PLAYER ACROSS THE SEASON")
     print(f"  distinct players     : {len(counts):,}")
     print(f"  mean battles         : {counts.mean():.1f}")
@@ -108,7 +111,7 @@ def main() -> int:
     print("\n" + "=" * 72)
     print("ASSUMPTION A1: is the final day representative?")
     print("=" * 72)
-    compare_final_day_to_midseason()
+    compare_final_day_to_midseason(arguments.parquet_dir)
     return 0
 
 

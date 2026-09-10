@@ -1,6 +1,6 @@
 """Build outcome-blind card embeddings from Season 18 deck co-occurrence.
 
-Usage:  python scripts/build_card_space.py [--dimensions N]
+Usage:  python scripts/build_card_space.py --parquet-dir PATH --reference-dir PATH
 
 Prints the singular value spectrum so the dimension count can be chosen from the
 data rather than guessed, then runs pre-registered checks stated before the space
@@ -21,11 +21,7 @@ import pandas as pd
 
 from crdata.embedding import LADDER_MODES, count_cooccurrence, factorise, pmi_matrix
 
-SCRATCH = Path(r"C:\Users\jfbaa\AppData\Local\Temp\claude"
-               r"\C--Users-jfbaa-OneDrive-Documents-clash2"
-               r"\d24c6794-c5fc-463a-925a-588dd12c92e6\scratchpad")
-PARQUET = SCRATCH / "season18_parquet"
-REFERENCE = SCRATCH / "season18"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED_DAY = "01042021"
 
 PREREGISTERED = [
@@ -35,13 +31,13 @@ PREREGISTERED = [
 ]
 
 
-def card_names() -> dict[int, str]:
-    frame = pd.read_csv(REFERENCE / "CardMasterListSeason18_12082020.csv")
+def card_names(reference_dir: Path) -> dict[int, str]:
+    frame = pd.read_csv(reference_dir / "CardMasterListSeason18_12082020.csv")
     return dict(zip(frame["team.card1.id"], frame["team.card1.name"]))
 
 
-def ladder_files() -> list[Path]:
-    return sorted(f for f in PARQUET.glob("*.parquet") if EXCLUDED_DAY not in f.name)
+def ladder_files(parquet_dir: Path) -> list[Path]:
+    return sorted(f for f in parquet_dir.glob("*.parquet") if EXCLUDED_DAY not in f.name)
 
 
 def report_spectrum(singular: np.ndarray) -> None:
@@ -83,10 +79,18 @@ def nearest(vectors: np.ndarray, index: dict[str, int], names: list[str],
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--parquet-dir", type=Path, required=True,
+                        help="directory containing converted Season 18 Parquet files")
+    parser.add_argument("--reference-dir", type=Path, required=True,
+                        help="directory containing the Season 18 card master CSV")
+    parser.add_argument("--output", type=Path,
+                        default=PROJECT_ROOT / "data" / "card_space.pkl")
     parser.add_argument("--dimensions", type=int, default=16)
     arguments = parser.parse_args()
 
-    files = ladder_files()
+    files = ladder_files(arguments.parquet_dir)
+    if not files:
+        parser.error(f"no eligible Parquet files found in {arguments.parquet_dir}")
     print(f"{len(files)} day files, Jan 4 excluded")
     print(f"modes kept: {LADDER_MODES}\n")
 
@@ -99,7 +103,7 @@ def main() -> int:
     vectors, singular = factorise(pmi, arguments.dimensions)
     report_spectrum(singular)
 
-    lookup = card_names()
+    lookup = card_names(arguments.reference_dir)
     names = [lookup.get(int(c), str(c)) for c in card_ids]
     index = {name: position for position, name in enumerate(names)}
 
@@ -114,11 +118,11 @@ def main() -> int:
         if card in index:
             nearest(vectors, index, names, card)
 
-    output = SCRATCH / "card_space.pkl"
-    with open(output, "wb") as handle:
+    arguments.output.parent.mkdir(parents=True, exist_ok=True)
+    with open(arguments.output, "wb") as handle:
         pickle.dump({"card_ids": card_ids, "vectors": vectors, "pmi": pmi,
                      "counts": counts, "singular": singular, "names": names}, handle)
-    print(f"\nsaved: {output}")
+    print(f"\nsaved: {arguments.output}")
     return 0
 
 

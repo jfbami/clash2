@@ -1,13 +1,13 @@
 """Build the one-row-per-player table from the Season 18 battle Parquet.
 
-Usage:  python scripts/build_player_table.py
+Usage:  python scripts/build_player_table.py --parquet-dir PATH
 
 Runs in two passes. The first melts every battle into its two sides and
 hash-partitions them by player tag into shards. The second reduces each shard
 to per-player behavioural features and concatenates the results.
 
-Writes `data/players.parquet`. Shards land in the scratchpad because they are
-an intermediate worth 1.6 GB, not a deliverable.
+Writes `data/players.parquet` by default. Shards default to
+`data/player_shards/`; both locations can be overridden.
 """
 from __future__ import annotations
 
@@ -23,28 +23,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from crdata.level_effect import season_files
 from crdata.player_panel import SHARDS, shard_features, write_player_battles
 
-SCRATCH = Path(r"C:\Users\jfbaa\AppData\Local\Temp\claude"
-               r"\C--Users-jfbaa-OneDrive-Documents-clash2")
-PARQUET = SCRATCH / "d24c6794-c5fc-463a-925a-588dd12c92e6" / "scratchpad" / "season18_parquet"
-SHARD_DIR = SCRATCH / "faf9482d-f87c-4635-9340-80f0de0b2114" / "scratchpad" / "player_shards"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED = ("01042021",)  # D9: the final day of the season is not representative.
 
 
-def melt(card_ids, force: bool) -> None:
-    if SHARD_DIR.exists() and any(SHARD_DIR.glob("*.parquet")) and not force:
-        print(f"reusing shards in {SHARD_DIR}")
+def melt(parquet_dir: Path, shard_dir: Path, card_ids, force: bool) -> None:
+    if shard_dir.exists() and any(shard_dir.glob("*.parquet")) and not force:
+        print(f"reusing shards in {shard_dir}")
         return
 
-    files = season_files(PARQUET, EXCLUDED)
+    files = season_files(parquet_dir, EXCLUDED)
     print(f"pass 1: melting {len(files)} day files into {SHARDS} shards\n", flush=True)
     started = time.time()
-    report = write_player_battles(files, SHARD_DIR, card_ids, SHARDS)
+    report = write_player_battles(files, shard_dir, card_ids, SHARDS)
     print(f"\n  {report.rows_written:,} player-battle rows across "
           f"{report.shards} shards in {time.time() - started:.0f}s\n")
 
 
-def reduce_shards() -> pd.DataFrame:
-    shards = sorted(SHARD_DIR.glob("*.parquet"))
+def reduce_shards(shard_dir: Path) -> pd.DataFrame:
+    shards = sorted(shard_dir.glob("*.parquet"))
     print(f"pass 2: reducing {len(shards)} shards to per-player features", flush=True)
     frames = []
     for position, shard in enumerate(shards, start=1):
@@ -72,19 +69,25 @@ def summarise(players: pd.DataFrame) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--parquet-dir", type=Path, required=True,
+                        help="directory containing converted Season 18 Parquet files")
+    parser.add_argument("--shard-dir", type=Path,
+                        default=PROJECT_ROOT / "data" / "player_shards")
+    parser.add_argument("--output", type=Path,
+                        default=PROJECT_ROOT / "data" / "players.parquet")
     parser.add_argument("--remelt", action="store_true", help="rebuild the shards")
     arguments = parser.parse_args()
 
-    root = Path(__file__).resolve().parents[1]
-    card_ids = pd.read_parquet(root / "data" / "reference" / "cards.parquet")["id"].to_numpy()
+    card_ids = pd.read_parquet(
+        PROJECT_ROOT / "data" / "reference" / "cards.parquet")["id"].to_numpy()
 
-    melt(card_ids, arguments.remelt)
-    players = reduce_shards()
+    melt(arguments.parquet_dir, arguments.shard_dir, card_ids, arguments.remelt)
+    players = reduce_shards(arguments.shard_dir)
 
-    destination = root / "data" / "players.parquet"
-    players.to_parquet(destination, compression="zstd", index=False)
+    arguments.output.parent.mkdir(parents=True, exist_ok=True)
+    players.to_parquet(arguments.output, compression="zstd", index=False)
     summarise(players)
-    print(f"\nwritten {destination}")
+    print(f"\nwritten {arguments.output}")
     return 0
 
 

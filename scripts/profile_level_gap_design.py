@@ -20,6 +20,7 @@ No outcome column is read. This pass commits to no modelling decision.
 """
 from __future__ import annotations
 
+import argparse
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,9 +41,7 @@ BAND_COUNT = 80
 GAP_LIMIT = 40
 TROPHY_DIFFERENCE_LIMIT = 200
 
-PARQUET = Path(r"C:\Users\jfbaa\AppData\Local\Temp\claude"
-               r"\C--Users-jfbaa-OneDrive-Documents-clash2"
-               r"\d24c6794-c5fc-463a-925a-588dd12c92e6\scratchpad\season18_parquet")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED = ("01042021",)  # D9: the final day of the season is not representative.
 
 
@@ -147,22 +146,28 @@ def profile_season(files: list[Path], card_ids: np.ndarray,
 
 
 def main() -> int:
-    cards = pd.read_parquet("data/reference/cards.parquet")
-    files = season_files(PARQUET, EXCLUDED)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--parquet-dir", type=Path, required=True,
+                        help="directory containing converted Season 18 Parquet files")
+    parser.add_argument("--output", type=Path,
+                        default=PROJECT_ROOT / "data" / "profile_level_gap.npz")
+    arguments = parser.parse_args()
+
+    cards = pd.read_parquet(PROJECT_ROOT / "data" / "reference" / "cards.parquet")
+    files = season_files(arguments.parquet_dir, EXCLUDED)
     print(f"{len(files)} day files, excluding {EXCLUDED}\n", flush=True)
 
     profile = profile_season(files, cards["id"].to_numpy(np.int64))
 
-    output = Path(__file__).resolve().parents[1] / "data" / "profile_level_gap.npz"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(output, card_ids=profile.card_ids, level_histogram=profile.level_histogram,
+    arguments.output.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(arguments.output, card_ids=profile.card_ids, level_histogram=profile.level_histogram,
              conditioning_cells=profile.conditioning_cells,
              trophy_difference=profile.trophy_difference,
              battles=profile.battles, rows_read=profile.rows_read)
 
     print(f"\nrows read      {profile.rows_read:,}")
     print(f"ladder battles {profile.battles:,}")
-    print(f"written        {output}")
+    print(f"written        {arguments.output}")
     return 0
 
 
