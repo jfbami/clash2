@@ -142,6 +142,9 @@ Both GRU bias vectors start at zero.
 The resulting 72 values pass through `Linear(72, 64)`, GELU, dropout with probability 0.1, and `Linear(64, 1)` to produce one logit.
 Dropout follows the head activation rather than the recurrent state or raw summary inputs.
 PyTorch's built-in GRU dropout remains zero because it has no effect with one recurrent layer.
+The 64-unit head is an initial compact candidate rather than a claim that contraction is more accurate.
+The head comparison must include direct linear fusion, `Linear(72, 1)`, the compact 64-unit nonlinear head, and an expanded 128-unit nonlinear head.
+Keep the upstream representation and evaluation split fixed, and select using held-out-player log loss and calibration.
 
 A bidirectional GRU is valid when it only processes a completed past window because every event in that window is already known at decision time.
 A causal single-direction GRU is easier to cache and update online.

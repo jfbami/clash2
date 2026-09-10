@@ -196,3 +196,11 @@ The built-in GRU dropout remains zero because PyTorch applies it only between re
 The 72-dimensional fused vector passes through `Linear(72, 64)`, GELU, dropout with probability 0.1, and `Linear(64, 1)`.
 The head returns one logit for binary cross-entropy with logits.
 Hidden widths 32 and 128, a two-layer GRU, dropout probabilities 0 and 0.2, a bidirectional GRU, and a linear fusion head remain required ablations.
+
+## 2026-09-10
+
+**D32. Treat head shape as an empirical comparison, not a settled accuracy choice.**
+The direct `Linear(72, 1)` switch head is the scientific reference baseline.
+Compare it with the implemented compact nonlinear head, `Linear(72, 64)`, GELU, dropout, and `Linear(64, 1)`, and an expanded nonlinear candidate using 128 hidden units.
+Hold the upstream encoder, data split, and training procedure fixed, then compare held-out-player log loss and calibration before selecting a head.
+This comparison applies specifically to `NextSwitchHead`; it does not automatically change `CardMLP` or `DeckMLP`, whose widths and structural ablations are separate decisions.
