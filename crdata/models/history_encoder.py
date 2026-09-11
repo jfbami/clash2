@@ -11,7 +11,7 @@ from crdata.sequences import SUMMARY_FEATURE_NAMES
 DEFAULT_DECK_DIM = 48
 DEFAULT_INPUT_DIM = DEFAULT_DECK_DIM + len(MODEL_FEATURE_NAMES)
 DEFAULT_HIDDEN_DIM = 64
-DEFAULT_HEAD_HIDDEN_DIM = 64
+DEFAULT_HEAD_HIDDEN_DIM = 128
 DEFAULT_DROPOUT = 0.1
 
 
@@ -101,16 +101,46 @@ class NextSwitchHead(nn.Module):
         return self.network(torch.cat((history, summary), dim=-1)).squeeze(-1)
 
     def _validate_inputs(self, history: Tensor, summary: Tensor) -> None:
-        if history.ndim != 2 or summary.ndim != 2:
-            raise ValueError("history and summary must have batch and feature axes")
-        if history.shape[0] != summary.shape[0]:
-            raise ValueError("history and summary must have the same batch size")
-        if history.shape[1] != self.history_dim:
-            raise ValueError(f"expected {self.history_dim} history features")
-        if summary.shape[1] != self.summary_dim:
-            raise ValueError(f"expected {self.summary_dim} summary features")
-        if not torch.is_floating_point(history) or not torch.is_floating_point(summary):
-            raise ValueError("history and summary must be floating point")
+        _validate_head_inputs(history, summary, self.history_dim, self.summary_dim)
+
+
+class LinearSwitchHead(nn.Module):
+    """Map fused recent and long-term context directly to one switch logit."""
+
+    def __init__(
+        self,
+        history_dim: int = DEFAULT_HIDDEN_DIM,
+        summary_dim: int = len(SUMMARY_FEATURE_NAMES),
+    ) -> None:
+        super().__init__()
+        if history_dim < 1 or summary_dim < 1:
+            raise ValueError("feature dimensions must be positive")
+        self.history_dim = history_dim
+        self.summary_dim = summary_dim
+        self.linear = nn.Linear(history_dim + summary_dim, 1)
+        nn.init.xavier_uniform_(self.linear.weight)
+        nn.init.zeros_(self.linear.bias)
+
+    def forward(self, history: Tensor, summary: Tensor) -> Tensor:
+        """Return one direct linear score per batch item."""
+        _validate_head_inputs(history, summary, self.history_dim, self.summary_dim)
+        return self.linear(torch.cat((history, summary), dim=-1)).squeeze(-1)
+
+
+def _validate_head_inputs(
+    history: Tensor, summary: Tensor, history_dim: int, summary_dim: int
+) -> None:
+    """Validate the shared contract for switch-head inputs."""
+    if history.ndim != 2 or summary.ndim != 2:
+        raise ValueError("history and summary must have batch and feature axes")
+    if history.shape[0] != summary.shape[0]:
+        raise ValueError("history and summary must have the same batch size")
+    if history.shape[1] != history_dim:
+        raise ValueError(f"expected {history_dim} history features")
+    if summary.shape[1] != summary_dim:
+        raise ValueError(f"expected {summary_dim} summary features")
+    if not torch.is_floating_point(history) or not torch.is_floating_point(summary):
+        raise ValueError("history and summary must be floating point")
 
 
 class NextSwitchModel(nn.Module):

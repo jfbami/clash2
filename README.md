@@ -118,8 +118,8 @@ this project attempts to: (measure aspects like skill) + create a recommendation
                                          +------------------+
 ```
 
-The card feature path, deck encoder, battle-token assembly, expanding-prefix behavioral summaries, forward GRU, and next-switch head are implemented.
-The training pipeline and later recommendation stages remain proposed.
+The card feature path, deck encoder, battle-token assembly, expanding-prefix behavioral summaries, forward GRU, next-switch head, and first head-ablation training pipeline are implemented.
+The final head selection and later recommendation stages remain proposed.
 
 ## How a battle is predicted
 

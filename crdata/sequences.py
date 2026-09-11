@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from math import log1p
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 import numpy as np
 
@@ -246,6 +246,24 @@ def build_sequence_example(
     """
     ordered = _ordered_player_battles(battles)
     _validate_window(history_length, window_start, len(ordered))
+    return _build_sequence_example(ordered, history_length, window_start)
+
+
+def iter_sequence_examples(
+    battles: Iterable[PlayerBattle],
+    history_length: int = DEFAULT_HISTORY_LENGTH,
+) -> Iterator[SequenceExample]:
+    """Yield every sliding next-switch window after sorting a player once."""
+    ordered = _ordered_player_battles(battles)
+    if history_length < 1:
+        raise ValueError("history_length must be positive")
+    for window_start in range(len(ordered) - history_length):
+        yield _build_sequence_example(ordered, history_length, window_start)
+
+
+def _build_sequence_example(
+    ordered: Sequence[PlayerBattle], history_length: int, window_start: int
+) -> SequenceExample:
     history = ordered[window_start:window_start + history_length]
     target = ordered[window_start + history_length]
     prior_battles = ordered[:window_start + history_length]

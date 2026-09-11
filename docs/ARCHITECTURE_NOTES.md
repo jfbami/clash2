@@ -145,6 +145,7 @@ PyTorch's built-in GRU dropout remains zero because it has no effect with one re
 The 64-unit head is an initial compact candidate rather than a claim that contraction is more accurate.
 The head comparison must include direct linear fusion, `Linear(72, 1)`, the compact 64-unit nonlinear head, and an expanded 128-unit nonlinear head.
 Keep the upstream representation and evaluation split fixed, and select using held-out-player log loss and calibration.
+After the first controlled run, the 128-unit expanded head became the working default for continued testing; D33 records why the choice remains provisional.
 
 A bidirectional GRU is valid when it only processes a completed past window because every event in that window is already known at decision time.
 A causal single-direction GRU is easier to cache and update online.

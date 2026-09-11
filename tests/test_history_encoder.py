@@ -8,9 +8,11 @@ from torch import nn
 
 from crdata.models.history_encoder import (
     DEFAULT_DROPOUT,
+    DEFAULT_HEAD_HIDDEN_DIM,
     DEFAULT_HIDDEN_DIM,
     DEFAULT_INPUT_DIM,
     GRUHistoryEncoder,
+    LinearSwitchHead,
     NextSwitchHead,
     NextSwitchModel,
 )
@@ -78,6 +80,7 @@ class NextSwitchHeadTests(unittest.TestCase):
 
         self.assertEqual(logits.shape, (4,))
         self.assertEqual(head.network[0].in_features, 72)
+        self.assertEqual(head.network[0].out_features, DEFAULT_HEAD_HIDDEN_DIM)
         self.assertIsInstance(head.network[2], nn.Dropout)
         self.assertEqual(head.network[2].p, DEFAULT_DROPOUT)
 
@@ -89,6 +92,19 @@ class NextSwitchHeadTests(unittest.TestCase):
                 torch.randn(4, DEFAULT_HIDDEN_DIM),
                 torch.randn(3, len(SUMMARY_FEATURE_NAMES)),
             )
+
+
+class LinearSwitchHeadTests(unittest.TestCase):
+    def test_maps_fused_context_directly_to_one_logit(self) -> None:
+        head = LinearSwitchHead()
+        logits = head(
+            torch.randn(4, DEFAULT_HIDDEN_DIM),
+            torch.randn(4, len(SUMMARY_FEATURE_NAMES)),
+        )
+
+        self.assertEqual(logits.shape, (4,))
+        self.assertEqual(head.linear.in_features, 72)
+        self.assertEqual(head.linear.out_features, 1)
 
 
 class NextSwitchModelTests(unittest.TestCase):

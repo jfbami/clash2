@@ -10,6 +10,7 @@ from crdata.sequences import (
     SUMMARY_FEATURE_NAMES,
     PlayerBattle,
     build_sequence_example,
+    iter_sequence_examples,
     jaccard_distance,
     player_battle_from_live_row,
 )
@@ -49,6 +50,16 @@ class SequenceExampleTests(unittest.TestCase):
         np.testing.assert_array_equal(example.deck_ids[-1], original)
         self.assertEqual(example.target_deck_ids, changed)
         self.assertNotIn(changed[-1], example.deck_ids)
+
+    def test_iterates_every_sliding_window(self) -> None:
+        deck = tuple(range(1, 9))
+        battles = [battle(position, deck) for position in range(13)]
+
+        examples = list(iter_sequence_examples(reversed(battles)))
+
+        self.assertEqual(len(examples), 3)
+        self.assertEqual(examples[0].target_time, battles[10].battle_time)
+        self.assertEqual(examples[-1].target_time, battles[12].battle_time)
 
     def test_summary_features_use_the_expanding_pre_target_prefix(self) -> None:
         deck_a = tuple(range(1, 9))

@@ -204,3 +204,9 @@ The direct `Linear(72, 1)` switch head is the scientific reference baseline.
 Compare it with the implemented compact nonlinear head, `Linear(72, 64)`, GELU, dropout, and `Linear(64, 1)`, and an expanded nonlinear candidate using 128 hidden units.
 Hold the upstream encoder, data split, and training procedure fixed, then compare held-out-player log loss and calibration before selecting a head.
 This comparison applies specifically to `NextSwitchHead`; it does not automatically change `CardMLP` or `DeckMLP`, whose widths and structural ablations are separate decisions.
+The first single-seed run supports a nonlinear head but does not settle compact versus expanded width; `docs/RESULTS_SWITCH_HEAD_ABLATION.md` records the preliminary result.
+
+**D33. Use the 128-unit expanded switch head as the working default.**
+The expanded head had the best test log loss, ROC AUC, accuracy, and calibration in the first controlled run, while adding only 4,736 parameters relative to the 64-unit head.
+This selects the model to carry into data-quality testing; it does not replace the required repeated-seed and sequence-continuity checks.
+The linear and 64-unit heads remain reproducible ablations rather than active defaults.
