@@ -18,6 +18,7 @@ import numpy as np
 
 CARDS_PER_DECK = 8
 DEFAULT_HISTORY_LENGTH = 10
+CONTINUITY_MODES = ("all", "same_collection")
 FEATURE_NAMES = (
     "result",
     "crown_difference",
@@ -50,6 +51,7 @@ class PlayerBattle:
     result: int
     crown_difference: int
     trophies: float
+    collected_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -132,6 +134,7 @@ def player_battle_from_live_row(
         result=result,
         crown_difference=int(row[f"{side}_crowns"]) - int(row[f"{opponent}_crowns"]),
         trophies=float(trophies) if trophies is not None else float("nan"),
+        collected_at=row.get("collected_at"),
     )
 
 
@@ -252,13 +255,38 @@ def build_sequence_example(
 def iter_sequence_examples(
     battles: Iterable[PlayerBattle],
     history_length: int = DEFAULT_HISTORY_LENGTH,
+    continuity: str = "all",
 ) -> Iterator[SequenceExample]:
-    """Yield every sliding next-switch window after sorting a player once."""
+    """Yield sliding windows, optionally requiring one collection timestamp."""
     ordered = _ordered_player_battles(battles)
+    for window_start in _eligible_window_starts(ordered, history_length, continuity):
+        yield _build_sequence_example(ordered, history_length, window_start)
+
+
+def count_sequence_examples(
+    battles: Iterable[PlayerBattle],
+    history_length: int = DEFAULT_HISTORY_LENGTH,
+    continuity: str = "all",
+) -> int:
+    """Count eligible windows without constructing their feature arrays."""
+    ordered = _ordered_player_battles(battles)
+    return sum(1 for _ in _eligible_window_starts(ordered, history_length, continuity))
+
+
+def _eligible_window_starts(
+    ordered: Sequence[PlayerBattle], history_length: int, continuity: str
+) -> Iterator[int]:
     if history_length < 1:
         raise ValueError("history_length must be positive")
+    if continuity not in CONTINUITY_MODES:
+        raise ValueError(f"continuity must be one of {CONTINUITY_MODES}")
     for window_start in range(len(ordered) - history_length):
-        yield _build_sequence_example(ordered, history_length, window_start)
+        if continuity == "same_collection":
+            window = ordered[window_start:window_start + history_length + 1]
+            timestamps = {battle.collected_at for battle in window}
+            if None in timestamps or len(timestamps) != 1:
+                continue
+        yield window_start
 
 
 def _build_sequence_example(

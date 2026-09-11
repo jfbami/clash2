@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from crdata.battle_features import fit_battle_feature_standardization
 from crdata.card_levels import fit_level_standardization
+from crdata.sequences import CONTINUITY_MODES
 from models.switch_model import SwitchPredictionModel
 from crdata.summary_features import fit_summary_feature_standardization
 from crdata.switch_dataset import build_switch_array_cache, load_switch_arrays
@@ -187,6 +188,11 @@ def main() -> int:
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--seed", type=int, default=20260910)
+    parser.add_argument("--continuity", choices=CONTINUITY_MODES, default="all")
+    parser.add_argument(
+        "--heads", nargs="+", choices=[name for name, _ in HEADS],
+        default=[name for name, _ in HEADS],
+    )
     parser.add_argument("--rebuild-cache", action="store_true")
     arguments = parser.parse_args()
     if arguments.epochs < 1 or arguments.batch_size < 1:
@@ -197,16 +203,27 @@ def main() -> int:
     if arguments.rebuild_cache or not (cache / "metadata.json").exists():
         print("building deduplicated sliding-window cache ...", flush=True)
         metadata = build_switch_array_cache(
-            arguments.data_root, arguments.card_reference, cache, arguments.seed
+            arguments.data_root,
+            arguments.card_reference,
+            cache,
+            arguments.seed,
+            arguments.continuity,
         )
     else:
         _, metadata = load_switch_arrays(cache)
+        cached_continuity = metadata.get("continuity", "all")
+        if cached_continuity != arguments.continuity:
+            parser.error(
+                f"cache uses continuity={cached_continuity!r}; "
+                "pass --rebuild-cache or choose a different output directory"
+            )
     print(json.dumps(metadata, indent=2), flush=True)
 
     arrays, metadata = load_switch_arrays(cache)
     arrays = transformed_arrays(arrays)
     results = []
-    for name, hidden_dim in HEADS:
+    selected_heads = [(name, width) for name, width in HEADS if name in arguments.heads]
+    for name, hidden_dim in selected_heads:
         results.append(train_one(
             name=name,
             head_hidden_dim=hidden_dim,

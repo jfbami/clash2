@@ -11,8 +11,10 @@ import pyarrow.parquet as pq
 
 from crdata.card_levels import load_card_level_converter
 from crdata.sequences import (
+    CONTINUITY_MODES,
     DEFAULT_HISTORY_LENGTH,
     PlayerBattle,
+    count_sequence_examples,
     iter_sequence_examples,
     player_battle_from_live_row,
 )
@@ -20,7 +22,7 @@ from crdata.vocabulary import load_card_vocabulary
 
 
 LIVE_COLUMNS = [
-    "battle_key", "battle_time", "label_a_win", "a_tag", "b_tag",
+    "battle_key", "battle_time", "collected_at", "label_a_win", "a_tag", "b_tag",
     "a_crowns", "b_crowns", "a_trophies", "b_trophies",
     "a_card_ids", "b_card_ids", "a_card_levels", "b_card_levels",
     "is_clean_1v1",
@@ -98,15 +100,23 @@ def build_switch_array_cache(
     card_reference: Path,
     destination: Path,
     seed: int = 20260910,
+    continuity: str = "all",
 ) -> dict:
     """Build memory-mappable arrays and return their audit metadata."""
+    if continuity not in CONTINUITY_MODES:
+        raise ValueError(f"continuity must be one of {CONTINUITY_MODES}")
     paths = live_paths(data_root)
     counts = qualified_player_counts(paths)
     print(f"found {len(counts):,} eligible players", flush=True)
     players = load_player_battles(paths, set(counts))
+    split_by_player = assign_player_splits(sorted(players), seed)
+    example_counts = {
+        tag: count_sequence_examples(battles, continuity=continuity)
+        for tag, battles in players.items()
+    }
+    players = {tag: battles for tag, battles in players.items() if example_counts[tag] > 0}
     player_tags = sorted(players)
-    split_by_player = assign_player_splits(player_tags, seed)
-    example_count = sum(len(battles) - DEFAULT_HISTORY_LENGTH for battles in players.values())
+    example_count = sum(example_counts[tag] for tag in player_tags)
     if example_count < 1:
         raise ValueError("no eligible next-switch examples were found")
 
@@ -140,7 +150,7 @@ def build_switch_array_cache(
 
     position = 0
     for player_index, tag in enumerate(player_tags):
-        for example in iter_sequence_examples(players[tag]):
+        for example in iter_sequence_examples(players[tag], continuity=continuity):
             arrays["cards"][position] = vocabulary.encode(example.deck_ids)
             displayed = level_converter.convert(example.deck_ids, example.card_levels)
             arrays["levels"][position] = displayed.astype(np.uint8)
@@ -166,10 +176,11 @@ def build_switch_array_cache(
         "players": len(player_tags),
         "embedding_rows": vocabulary.embedding_rows,
         "seed": seed,
+        "continuity": continuity,
         "battle_files": len(paths),
         "splits": {
             name: {
-                "players": sum(value == index for value in split_by_player.values()),
+                "players": sum(split_by_player[tag] == index for tag in player_tags),
                 "examples": int(np.sum(split_array == index)),
                 "switch_rate": float(np.mean(label_array[split_array == index])),
             }
