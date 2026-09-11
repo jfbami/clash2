@@ -19,7 +19,7 @@ import torch
 from sklearn.metrics import log_loss, roc_auc_score
 from torch import nn
 
-from crdata.models.matchup import MatchupModel
+from models.matchup import MatchupModel
 from crdata.season18 import as_index_arrays, load_randomised
 
 def to_tensors(data, rows: slice) -> dict[str, torch.Tensor]:

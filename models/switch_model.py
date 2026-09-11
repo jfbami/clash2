@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from torch import Tensor, nn
 
-from crdata.models.battle_encoder import BattleTokenAssembler
-from crdata.models.card_encoder import CardFeatures, CardMLP, DeckMLP, SumDeckPool
-from crdata.models.history_encoder import (
+from models.battle_encoder import BattleTokenAssembler
+from models.card_encoder import CardFeatures, CardMLP, DeckMLP, SumDeckPool
+from models.history_encoder import (
     DEFAULT_HIDDEN_DIM,
     DEFAULT_INPUT_DIM,
     GRUHistoryEncoder,

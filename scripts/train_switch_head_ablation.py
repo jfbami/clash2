@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from crdata.battle_features import fit_battle_feature_standardization
 from crdata.card_levels import fit_level_standardization
-from crdata.models.switch_model import SwitchPredictionModel
+from models.switch_model import SwitchPredictionModel
 from crdata.summary_features import fit_summary_feature_standardization
 from crdata.switch_dataset import build_switch_array_cache, load_switch_arrays
 
