@@ -32,8 +32,11 @@ ARRAY_NAMES = (
     "cards", "levels", "battle_features", "summary_features", "labels",
     "splits", "player_indices",
 )
-OPTIONAL_ARRAY_NAMES = ("next_wins",)
+OPTIONAL_ARRAY_NAMES = ("next_wins", "propensity_folds")
 SPLIT_NAMES = ("train", "validation", "test")
+DEFAULT_PROPENSITY_FOLD_COUNT = 5
+DEFAULT_PROPENSITY_FOLD_SEED = 20260913
+NO_PROPENSITY_FOLD = np.uint8(255)
 
 
 def live_paths(root: Path) -> list[Path]:
@@ -97,6 +100,38 @@ def assign_player_splits(player_tags: list[str], seed: int = 20260910) -> dict[s
     }
 
 
+def assign_training_player_folds(
+    player_tags: list[str],
+    split_by_player: dict[str, int],
+    example_counts: dict[str, int],
+    fold_count: int = DEFAULT_PROPENSITY_FOLD_COUNT,
+    seed: int = DEFAULT_PROPENSITY_FOLD_SEED,
+) -> dict[str, int]:
+    """Assign each training player to one reproducible, size-balanced fold."""
+    if not 2 <= fold_count < int(NO_PROPENSITY_FOLD):
+        raise ValueError("fold_count must be between 2 and 254")
+    training_players = [tag for tag in player_tags if split_by_player[tag] == 0]
+    if len(training_players) < fold_count:
+        raise ValueError("each propensity fold needs at least one training player")
+    if any(example_counts.get(tag, 0) < 1 for tag in training_players):
+        raise ValueError("every training player needs at least one example")
+
+    shuffled = np.asarray(training_players, dtype=object)
+    np.random.default_rng(seed).shuffle(shuffled)
+    ordered = sorted(
+        (str(tag) for tag in shuffled),
+        key=lambda tag: example_counts[tag],
+        reverse=True,
+    )
+    examples_per_fold = [0] * fold_count
+    fold_by_player = {}
+    for tag in ordered:
+        fold = int(np.argmin(examples_per_fold))
+        fold_by_player[tag] = fold
+        examples_per_fold[fold] += example_counts[tag]
+    return fold_by_player
+
+
 def build_switch_array_cache(
     data_root: Path,
     card_reference: Path,
@@ -104,6 +139,8 @@ def build_switch_array_cache(
     seed: int = 20260910,
     continuity: str = "all",
     summary_feature_set: str = "baseline",
+    propensity_fold_count: int = DEFAULT_PROPENSITY_FOLD_COUNT,
+    propensity_fold_seed: int = DEFAULT_PROPENSITY_FOLD_SEED,
 ) -> dict:
     """Build memory-mappable arrays and return their audit metadata."""
     if continuity not in CONTINUITY_MODES:
@@ -124,6 +161,13 @@ def build_switch_array_cache(
     }
     players = {tag: battles for tag, battles in players.items() if example_counts[tag] > 0}
     player_tags = sorted(players)
+    propensity_fold_by_player = assign_training_player_folds(
+        player_tags,
+        split_by_player,
+        example_counts,
+        fold_count=propensity_fold_count,
+        seed=propensity_fold_seed,
+    )
     example_count = sum(example_counts[tag] for tag in player_tags)
     if example_count < 1:
         raise ValueError("no eligible next-switch examples were found")
@@ -136,6 +180,7 @@ def build_switch_array_cache(
         "summary_features": (example_count, len(summary_feature_names)),
         "labels": (example_count,),
         "next_wins": (example_count,),
+        "propensity_folds": (example_count,),
         "splits": (example_count,),
         "player_indices": (example_count,),
     }
@@ -146,6 +191,7 @@ def build_switch_array_cache(
         "summary_features": np.float32,
         "labels": np.uint8,
         "next_wins": np.uint8,
+        "propensity_folds": np.uint8,
         "splits": np.uint8,
         "player_indices": np.uint32,
     }
@@ -173,6 +219,9 @@ def build_switch_array_cache(
             arrays["labels"][position] = example.next_switch
             arrays["next_wins"][position] = example.next_win
             arrays["splits"][position] = split_by_player[tag]
+            arrays["propensity_folds"][position] = propensity_fold_by_player.get(
+                tag, NO_PROPENSITY_FOLD
+            )
             arrays["player_indices"][position] = player_index
             position += 1
         if (player_index + 1) % 500 == 0 or player_index + 1 == len(player_tags):
@@ -187,6 +236,7 @@ def build_switch_array_cache(
     split_array = arrays["splits"]
     label_array = arrays["labels"]
     next_win_array = arrays["next_wins"]
+    propensity_fold_array = arrays["propensity_folds"]
     metadata = {
         "examples": example_count,
         "players": len(player_tags),
@@ -198,6 +248,24 @@ def build_switch_array_cache(
         "targets": {
             "labels": "next_switch",
             "next_wins": "next_win",
+        },
+        "propensity_folds": {
+            "count": propensity_fold_count,
+            "seed": propensity_fold_seed,
+            "not_training_value": int(NO_PROPENSITY_FOLD),
+            "folds": {
+                str(fold): {
+                    "players": sum(
+                        assigned_fold == fold
+                        for assigned_fold in propensity_fold_by_player.values()
+                    ),
+                    "examples": int(np.sum(propensity_fold_array == fold)),
+                    "switch_rate": float(
+                        np.mean(label_array[propensity_fold_array == fold])
+                    ),
+                }
+                for fold in range(propensity_fold_count)
+            },
         },
         "battle_files": len(paths),
         "splits": {
