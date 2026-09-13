@@ -18,3 +18,7 @@ After establishing that baseline, use
 `scripts/train_current_deck_count_colab.ipynb` for the controlled ablation that
 adds total observed usage of the player's current exact deck.
 
+Once that feature is selected, `scripts/train_switch_oof_colab.ipynb` generates
+five player-level out-of-fold switch-propensity predictions for later outcome
+modelling.
+

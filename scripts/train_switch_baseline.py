@@ -63,9 +63,18 @@ def metrics(labels: np.ndarray, logits: np.ndarray) -> dict[str, float]:
 
 def prepare_arrays(
     arrays: dict[str, np.ndarray],
+    fitting_indices: np.ndarray | None = None,
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
-    """Fit preprocessing on training players and transform model inputs."""
-    training = np.flatnonzero(arrays["splits"] == 0)
+    """Fit preprocessing on selected training rows and transform model inputs."""
+    training = (
+        np.flatnonzero(arrays["splits"] == 0)
+        if fitting_indices is None
+        else np.asarray(fitting_indices)
+    )
+    if training.ndim != 1 or len(training) == 0:
+        raise ValueError("preprocessing fitting indices must be a nonempty vector")
+    if np.any(np.asarray(arrays["splits"])[training] != 0):
+        raise ValueError("preprocessing may be fitted only on training players")
     level_stats = fit_level_standardization(arrays["levels"][training])
     battle_stats = fit_battle_feature_standardization(arrays["battle_features"][training])
     summary_stats = fit_summary_feature_standardization(
