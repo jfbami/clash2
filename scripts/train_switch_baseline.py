@@ -20,8 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from crdata.battle_features import fit_battle_feature_standardization
 from crdata.card_levels import fit_level_standardization
+from crdata.sequences import SUMMARY_FEATURE_SETS
 from crdata.summary_features import fit_summary_feature_standardization
-from crdata.switch_dataset import load_switch_arrays
+from crdata.switch_dataset import build_switch_array_cache, load_switch_arrays
 from models.switch_model import SwitchPredictionModel
 
 
@@ -67,7 +68,10 @@ def prepare_arrays(
     training = np.flatnonzero(arrays["splits"] == 0)
     level_stats = fit_level_standardization(arrays["levels"][training])
     battle_stats = fit_battle_feature_standardization(arrays["battle_features"][training])
-    summary_stats = fit_summary_feature_standardization(arrays["summary_features"][training])
+    summary_stats = fit_summary_feature_standardization(
+        arrays["summary_features"][training],
+        expected_feature_count=arrays["summary_features"].shape[-1],
+    )
     prepared = {
         **arrays,
         "battle_features": battle_stats.transform(arrays["battle_features"]),
@@ -184,7 +188,7 @@ def restore_rng_state(checkpoint: dict[str, Any]) -> None:
 
 def training_signature(arguments: argparse.Namespace, seed: int) -> dict[str, Any]:
     """Return settings that must match before an interrupted run can resume."""
-    return {
+    signature = {
         "seed": seed,
         "max_epochs": arguments.max_epochs,
         "patience": arguments.patience,
@@ -194,6 +198,10 @@ def training_signature(arguments: argparse.Namespace, seed: int) -> dict[str, An
         "weight_decay": arguments.weight_decay,
         "head_hidden_dim": HEAD_HIDDEN_DIM,
     }
+    summary_feature_set = getattr(arguments, "summary_feature_set", "baseline")
+    if summary_feature_set != "baseline":
+        signature["summary_feature_set"] = summary_feature_set
+    return signature
 
 
 def train_seed(
@@ -228,6 +236,7 @@ def train_seed(
         level_mean=float(preprocessing["level_mean"]),
         level_standard_deviation=float(preprocessing["level_standard_deviation"]),
         head_hidden_dim=HEAD_HIDDEN_DIM,
+        summary_dim=int(tensors["summary_features"].shape[-1]),
     ).to(device)
     optimizer = torch.optim.AdamW(
         model.parameters(),
@@ -425,6 +434,29 @@ def parse_arguments() -> argparse.Namespace:
         default=PROJECT_ROOT / "data" / "switch_continuity_same_collection" / "arrays",
     )
     parser.add_argument(
+        "--data-root", type=Path, default=PROJECT_ROOT / "data" / "battles"
+    )
+    parser.add_argument(
+        "--card-reference",
+        type=Path,
+        default=PROJECT_ROOT / "data" / "reference" / "cards.parquet",
+    )
+    parser.add_argument(
+        "--summary-feature-set",
+        choices=tuple(SUMMARY_FEATURE_SETS),
+        default="baseline",
+    )
+    parser.add_argument(
+        "--build-cache",
+        action="store_true",
+        help="build the requested strict cache before training",
+    )
+    parser.add_argument(
+        "--build-cache-only",
+        action="store_true",
+        help="build the requested strict cache and exit without training",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=PROJECT_ROOT / "data" / "switch_baseline_expanded_128",
@@ -463,9 +495,31 @@ def main() -> int:
     torch.backends.cudnn.benchmark = False
     arguments.output_dir.mkdir(parents=True, exist_ok=True)
 
+    if (
+        arguments.build_cache
+        or arguments.build_cache_only
+        or not (arguments.cache / "metadata.json").exists()
+    ):
+        build_switch_array_cache(
+            arguments.data_root,
+            arguments.card_reference,
+            arguments.cache,
+            seed=20260910,
+            continuity="same_collection",
+            summary_feature_set=arguments.summary_feature_set,
+        )
+    if arguments.build_cache_only:
+        print(f"cache ready: {arguments.cache}", flush=True)
+        return 0
     arrays, metadata = load_switch_arrays(arguments.cache)
     if metadata.get("continuity") != "same_collection":
         raise ValueError("baseline training requires a same_collection cache")
+    cached_feature_set = metadata.get("summary_feature_set", "baseline")
+    if cached_feature_set != arguments.summary_feature_set:
+        raise ValueError(
+            f"cache uses summary_feature_set={cached_feature_set!r}; "
+            f"requested {arguments.summary_feature_set!r}"
+        )
     arrays, preprocessing = prepare_arrays(arrays)
     tensors = tensors_on_device(arrays, device)
     runtime = environment_metadata(device)

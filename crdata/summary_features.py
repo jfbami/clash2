@@ -8,7 +8,7 @@ import numpy as np
 from crdata.sequences import SUMMARY_FEATURE_NAMES
 
 
-_FEATURE_COUNT = len(SUMMARY_FEATURE_NAMES)
+_BASE_FEATURE_COUNT = len(SUMMARY_FEATURE_NAMES)
 
 
 @dataclass(frozen=True)
@@ -20,10 +20,11 @@ class SummaryFeatureStandardization:
 
     def transform(self, summary_features: np.ndarray) -> np.ndarray:
         """Mean-impute undefined rates and standardize every summary column."""
-        features = _validated_summary_array(summary_features).copy()
+        feature_count = len(self.means)
+        features = _validated_summary_array(summary_features, feature_count).copy()
         means = np.asarray(self.means, dtype=np.float32)
         standard_deviations = np.asarray(self.standard_deviations, dtype=np.float32)
-        if means.shape != (_FEATURE_COUNT,) or standard_deviations.shape != means.shape:
+        if means.shape != (feature_count,) or standard_deviations.shape != means.shape:
             raise ValueError("standardization statistics have the wrong shape")
         if not np.isfinite(means).all() or not np.isfinite(standard_deviations).all():
             raise ValueError("standardization statistics must be finite")
@@ -36,9 +37,12 @@ class SummaryFeatureStandardization:
 
 def fit_summary_feature_standardization(
     training_features: np.ndarray,
+    expected_feature_count: int = _BASE_FEATURE_COUNT,
 ) -> SummaryFeatureStandardization:
     """Fit population statistics using only training-player summaries."""
-    features = _validated_summary_array(training_features).astype(np.float64)
+    features = _validated_summary_array(
+        training_features, expected_feature_count
+    ).astype(np.float64)
     reduction_axes = tuple(range(features.ndim - 1))
     observed_counts = np.sum(~np.isnan(features), axis=reduction_axes)
     if np.any(observed_counts == 0):
@@ -55,10 +59,16 @@ def fit_summary_feature_standardization(
     )
 
 
-def _validated_summary_array(summary_features: np.ndarray) -> np.ndarray:
+def _validated_summary_array(
+    summary_features: np.ndarray, expected_feature_count: int
+) -> np.ndarray:
+    if expected_feature_count < 1:
+        raise ValueError("expected_feature_count must be positive")
     features = np.asarray(summary_features, dtype=np.float32)
-    if features.ndim < 1 or features.shape[-1] != _FEATURE_COUNT:
-        raise ValueError(f"summary_features must end with {_FEATURE_COUNT} columns")
+    if features.ndim < 1 or features.shape[-1] != expected_feature_count:
+        raise ValueError(
+            f"summary_features must end with {expected_feature_count} columns"
+        )
     if features.size == 0:
         raise ValueError("summary_features cannot be empty")
     if np.isinf(features).any():

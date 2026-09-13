@@ -13,6 +13,7 @@ from crdata.card_levels import load_card_level_converter
 from crdata.sequences import (
     CONTINUITY_MODES,
     DEFAULT_HISTORY_LENGTH,
+    SUMMARY_FEATURE_SETS,
     PlayerBattle,
     count_sequence_examples,
     iter_sequence_examples,
@@ -101,10 +102,16 @@ def build_switch_array_cache(
     destination: Path,
     seed: int = 20260910,
     continuity: str = "all",
+    summary_feature_set: str = "baseline",
 ) -> dict:
     """Build memory-mappable arrays and return their audit metadata."""
     if continuity not in CONTINUITY_MODES:
         raise ValueError(f"continuity must be one of {CONTINUITY_MODES}")
+    if summary_feature_set not in SUMMARY_FEATURE_SETS:
+        raise ValueError(
+            f"summary_feature_set must be one of {tuple(SUMMARY_FEATURE_SETS)}"
+        )
+    summary_feature_names = SUMMARY_FEATURE_SETS[summary_feature_set]
     paths = live_paths(data_root)
     counts = qualified_player_counts(paths)
     print(f"found {len(counts):,} eligible players", flush=True)
@@ -125,7 +132,7 @@ def build_switch_array_cache(
         "cards": (example_count, DEFAULT_HISTORY_LENGTH, 8),
         "levels": (example_count, DEFAULT_HISTORY_LENGTH, 8),
         "battle_features": (example_count, DEFAULT_HISTORY_LENGTH, 6),
-        "summary_features": (example_count, 8),
+        "summary_features": (example_count, len(summary_feature_names)),
         "labels": (example_count,),
         "splits": (example_count,),
         "player_indices": (example_count,),
@@ -150,7 +157,11 @@ def build_switch_array_cache(
 
     position = 0
     for player_index, tag in enumerate(player_tags):
-        for example in iter_sequence_examples(players[tag], continuity=continuity):
+        for example in iter_sequence_examples(
+            players[tag],
+            continuity=continuity,
+            summary_feature_set=summary_feature_set,
+        ):
             arrays["cards"][position] = vocabulary.encode(example.deck_ids)
             displayed = level_converter.convert(example.deck_ids, example.card_levels)
             arrays["levels"][position] = displayed.astype(np.uint8)
@@ -177,6 +188,8 @@ def build_switch_array_cache(
         "embedding_rows": vocabulary.embedding_rows,
         "seed": seed,
         "continuity": continuity,
+        "summary_feature_set": summary_feature_set,
+        "summary_feature_names": list(summary_feature_names),
         "battle_files": len(paths),
         "splits": {
             name: {

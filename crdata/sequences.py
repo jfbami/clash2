@@ -37,6 +37,12 @@ SUMMARY_FEATURE_NAMES = (
     "log1p_post_loss_opportunities",
     "log1p_post_win_opportunities",
 )
+CURRENT_DECK_COUNT_FEATURE_SET = "current_deck_count"
+SUMMARY_FEATURE_SETS = {
+    "baseline": SUMMARY_FEATURE_NAMES,
+    CURRENT_DECK_COUNT_FEATURE_SET: SUMMARY_FEATURE_NAMES
+    + ("log1p_current_deck_battle_count",),
+}
 
 
 @dataclass(frozen=True)
@@ -67,6 +73,7 @@ class SequenceExample:
     history_times: tuple[datetime, ...]
     target_time: datetime
     target_deck_ids: tuple[int, ...]
+    summary_names: tuple[str, ...] = SUMMARY_FEATURE_NAMES
 
     @property
     def feature_names(self) -> tuple[str, ...]:
@@ -74,7 +81,7 @@ class SequenceExample:
 
     @property
     def summary_feature_names(self) -> tuple[str, ...]:
-        return SUMMARY_FEATURE_NAMES
+        return self.summary_names
 
 
 def jaccard_distance(deck_a: Sequence[int], deck_b: Sequence[int]) -> float:
@@ -201,7 +208,10 @@ def _current_deck_tenure(history: Sequence[PlayerBattle]) -> int:
     return tenure
 
 
-def _summary_features(prior_battles: Sequence[PlayerBattle]) -> np.ndarray:
+def _summary_features(
+    prior_battles: Sequence[PlayerBattle], summary_feature_set: str
+) -> np.ndarray:
+    summary_names = _summary_names(summary_feature_set)
     switch_count = 0
     switch_magnitudes = []
     post_loss_opportunities = 0
@@ -225,7 +235,7 @@ def _summary_features(prior_battles: Sequence[PlayerBattle]) -> np.ndarray:
     mean_switch_magnitude = (
         float(np.mean(switch_magnitudes)) if switch_magnitudes else float("nan")
     )
-    return np.asarray([
+    values = [
         _rate(switch_count, transition_count),
         _rate(post_loss_switches, post_loss_opportunities),
         _rate(post_win_switches, post_win_opportunities),
@@ -234,13 +244,32 @@ def _summary_features(prior_battles: Sequence[PlayerBattle]) -> np.ndarray:
         log1p(len(prior_battles)),
         log1p(post_loss_opportunities),
         log1p(post_win_opportunities),
-    ], dtype=np.float32)
+    ]
+    if summary_feature_set == CURRENT_DECK_COUNT_FEATURE_SET:
+        current_deck = prior_battles[-1].deck_ids
+        current_deck_battles = sum(
+            battle.deck_ids == current_deck for battle in prior_battles
+        )
+        values.append(log1p(current_deck_battles))
+    if len(values) != len(summary_names):
+        raise RuntimeError("summary feature values do not match their declared names")
+    return np.asarray(values, dtype=np.float32)
+
+
+def _summary_names(summary_feature_set: str) -> tuple[str, ...]:
+    try:
+        return SUMMARY_FEATURE_SETS[summary_feature_set]
+    except KeyError as error:
+        raise ValueError(
+            f"summary_feature_set must be one of {tuple(SUMMARY_FEATURE_SETS)}"
+        ) from error
 
 
 def build_sequence_example(
     battles: Iterable[PlayerBattle],
     history_length: int = DEFAULT_HISTORY_LENGTH,
     window_start: int = 0,
+    summary_feature_set: str = "baseline",
 ) -> SequenceExample:
     """Build one chronological history and its next-switch target.
 
@@ -249,18 +278,24 @@ def build_sequence_example(
     """
     ordered = _ordered_player_battles(battles)
     _validate_window(history_length, window_start, len(ordered))
-    return _build_sequence_example(ordered, history_length, window_start)
+    return _build_sequence_example(
+        ordered, history_length, window_start, summary_feature_set
+    )
 
 
 def iter_sequence_examples(
     battles: Iterable[PlayerBattle],
     history_length: int = DEFAULT_HISTORY_LENGTH,
     continuity: str = "all",
+    summary_feature_set: str = "baseline",
 ) -> Iterator[SequenceExample]:
     """Yield sliding windows, optionally requiring one collection timestamp."""
     ordered = _ordered_player_battles(battles)
+    _summary_names(summary_feature_set)
     for window_start in _eligible_window_starts(ordered, history_length, continuity):
-        yield _build_sequence_example(ordered, history_length, window_start)
+        yield _build_sequence_example(
+            ordered, history_length, window_start, summary_feature_set
+        )
 
 
 def count_sequence_examples(
@@ -290,7 +325,10 @@ def _eligible_window_starts(
 
 
 def _build_sequence_example(
-    ordered: Sequence[PlayerBattle], history_length: int, window_start: int
+    ordered: Sequence[PlayerBattle],
+    history_length: int,
+    window_start: int,
+    summary_feature_set: str,
 ) -> SequenceExample:
     history = ordered[window_start:window_start + history_length]
     target = ordered[window_start + history_length]
@@ -299,10 +337,11 @@ def _build_sequence_example(
         deck_ids=np.asarray([battle.deck_ids for battle in history], dtype=np.int64),
         card_levels=np.asarray([battle.card_levels for battle in history], dtype=np.float32),
         battle_features=_feature_matrix(history),
-        summary_features=_summary_features(prior_battles),
+        summary_features=_summary_features(prior_battles, summary_feature_set),
         next_switch=np.int8(target.deck_ids != history[-1].deck_ids),
         player_tag=history[0].player_tag,
         history_times=tuple(battle.battle_time for battle in history),
         target_time=target.battle_time,
         target_deck_ids=target.deck_ids,
+        summary_names=_summary_names(summary_feature_set),
     )

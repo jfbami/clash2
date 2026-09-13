@@ -25,8 +25,13 @@ class SwitchPredictionModel(nn.Module):
         level_standard_deviation: float,
         head_hidden_dim: int | None,
         dropout: float = 0.1,
+        summary_dim: int | None = None,
     ) -> None:
         super().__init__()
+        if summary_dim is None:
+            summary_dim = len(SUMMARY_FEATURE_NAMES)
+        if summary_dim < 1:
+            raise ValueError("summary_dim must be positive")
         self.card_features = CardFeatures(
             embedding_rows=embedding_rows,
             embedding_dim=24,
@@ -44,12 +49,12 @@ class SwitchPredictionModel(nn.Module):
         if head_hidden_dim is None:
             self.switch_head = LinearSwitchHead(
                 history_dim=DEFAULT_HIDDEN_DIM,
-                summary_dim=len(SUMMARY_FEATURE_NAMES),
+                summary_dim=summary_dim,
             )
         else:
             self.switch_head = NextSwitchHead(
                 history_dim=DEFAULT_HIDDEN_DIM,
-                summary_dim=len(SUMMARY_FEATURE_NAMES),
+                summary_dim=summary_dim,
                 hidden_dim=head_hidden_dim,
                 dropout=dropout,
             )

@@ -14,3 +14,7 @@ Copy or sync this folder to `MyDrive/clash2`, including the ignored
 all cells using a GPU runtime. Training progress and results are saved back to
 Drive, so an interrupted run can resume.
 
+After establishing that baseline, use
+`scripts/train_current_deck_count_colab.ipynb` for the controlled ablation that
+adds total observed usage of the player's current exact deck.
+
