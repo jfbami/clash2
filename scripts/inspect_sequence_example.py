@@ -111,6 +111,7 @@ def print_example(example, vocabulary) -> None:
     print(f"target battle at {example.target_time.isoformat()}")
     print(f"target deck ids: {list(example.target_deck_ids)}")
     print(f"next_switch: {int(example.next_switch)}")
+    print(f"next_win: {int(example.next_win)}")
 
 
 def main() -> int:

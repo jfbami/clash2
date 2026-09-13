@@ -1,8 +1,7 @@
 """Build player-oriented sequential examples from live battle records.
 
-The first modelling slice predicts whether a player changes decks in the next
-battle.
-Ten battles form the history and the following battle supplies only the target.
+The first modelling slices use a player's next-battle deck choice and result.
+Ten battles form the history and the following battle supplies only targets.
 This module deliberately stops at the data contract: it does not embed cards,
 normalise features, pad sequences, or construct a neural network.
 """
@@ -62,13 +61,14 @@ class PlayerBattle:
 
 @dataclass(frozen=True)
 class SequenceExample:
-    """One next-switch example with model inputs separated from metadata."""
+    """One sequence with pre-battle inputs separated from next-battle targets."""
 
     deck_ids: np.ndarray
     card_levels: np.ndarray
     battle_features: np.ndarray
     summary_features: np.ndarray
     next_switch: np.int8
+    next_win: np.int8
     player_tag: str
     history_times: tuple[datetime, ...]
     target_time: datetime
@@ -271,7 +271,7 @@ def build_sequence_example(
     window_start: int = 0,
     summary_feature_set: str = "baseline",
 ) -> SequenceExample:
-    """Build one chronological history and its next-switch target.
+    """Build one chronological history and its next-action targets.
 
     Transition features on the first history row are zero because the model is
     not given the battle preceding the selected window.
@@ -339,6 +339,7 @@ def _build_sequence_example(
         battle_features=_feature_matrix(history),
         summary_features=_summary_features(prior_battles, summary_feature_set),
         next_switch=np.int8(target.deck_ids != history[-1].deck_ids),
+        next_win=np.int8(target.result == 1),
         player_tag=history[0].player_tag,
         history_times=tuple(battle.battle_time for battle in history),
         target_time=target.battle_time,

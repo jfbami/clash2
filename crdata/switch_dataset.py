@@ -1,4 +1,4 @@
-"""Build disk-backed next-switch arrays from deduplicated live battles."""
+"""Build disk-backed next-switch and outcome arrays from live battles."""
 from __future__ import annotations
 
 import json
@@ -32,6 +32,7 @@ ARRAY_NAMES = (
     "cards", "levels", "battle_features", "summary_features", "labels",
     "splits", "player_indices",
 )
+OPTIONAL_ARRAY_NAMES = ("next_wins",)
 SPLIT_NAMES = ("train", "validation", "test")
 
 
@@ -134,6 +135,7 @@ def build_switch_array_cache(
         "battle_features": (example_count, DEFAULT_HISTORY_LENGTH, 6),
         "summary_features": (example_count, len(summary_feature_names)),
         "labels": (example_count,),
+        "next_wins": (example_count,),
         "splits": (example_count,),
         "player_indices": (example_count,),
     }
@@ -143,6 +145,7 @@ def build_switch_array_cache(
         "battle_features": np.float32,
         "summary_features": np.float32,
         "labels": np.uint8,
+        "next_wins": np.uint8,
         "splits": np.uint8,
         "player_indices": np.uint32,
     }
@@ -168,6 +171,7 @@ def build_switch_array_cache(
             arrays["battle_features"][position] = example.battle_features
             arrays["summary_features"][position] = example.summary_features
             arrays["labels"][position] = example.next_switch
+            arrays["next_wins"][position] = example.next_win
             arrays["splits"][position] = split_by_player[tag]
             arrays["player_indices"][position] = player_index
             position += 1
@@ -182,6 +186,7 @@ def build_switch_array_cache(
         array.flush()
     split_array = arrays["splits"]
     label_array = arrays["labels"]
+    next_win_array = arrays["next_wins"]
     metadata = {
         "examples": example_count,
         "players": len(player_tags),
@@ -190,12 +195,17 @@ def build_switch_array_cache(
         "continuity": continuity,
         "summary_feature_set": summary_feature_set,
         "summary_feature_names": list(summary_feature_names),
+        "targets": {
+            "labels": "next_switch",
+            "next_wins": "next_win",
+        },
         "battle_files": len(paths),
         "splits": {
             name: {
                 "players": sum(split_by_player[tag] == index for tag in player_tags),
                 "examples": int(np.sum(split_array == index)),
                 "switch_rate": float(np.mean(label_array[split_array == index])),
+                "win_rate": float(np.mean(next_win_array[split_array == index])),
             }
             for index, name in enumerate(SPLIT_NAMES)
         },
@@ -215,4 +225,9 @@ def load_switch_arrays(cache: Path) -> tuple[dict[str, np.ndarray], dict]:
     arrays = {
         name: np.load(cache / f"{name}.npy", mmap_mode="r") for name in ARRAY_NAMES
     }
+    arrays.update({
+        name: np.load(cache / f"{name}.npy", mmap_mode="r")
+        for name in OPTIONAL_ARRAY_NAMES
+        if (cache / f"{name}.npy").exists()
+    })
     return arrays, metadata
