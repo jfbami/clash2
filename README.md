@@ -97,3 +97,33 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the feature definitions,
 implementation map, and additional notes.
 
 + more to come!!!
+
+## Features
+
+### Battle features
+
+- **Result:** whether the player won or lost
+- **Crown difference:** the player's crowns minus the opponent's crowns
+- **Changed deck:** whether the player changed their exact deck before this battle
+- **Switch magnitude:** how different the new deck was from the previous deck
+- **Time gap:** log-transformed hours since the previous battle
+- **Trophies:** the player's trophy count
+- **Trophies missing:** whether the trophy count was unavailable
+
+The model receives these seven values for each of the ten battles.
+
+### Long-term player features
+
+- **Historical switch rate:** the share of all prior battle transitions where the player changed decks
+- **Post-loss switch rate:** the share of prior losses after which the player changed decks
+- **Post-win switch rate:** the share of prior wins after which the player changed decks
+- **Mean switch magnitude:** the average deck difference across the player's prior switches
+- **Current-deck tenure:** the number of consecutive recent battles played with the current exact deck
+- **Prior battle count:** the total number of battles observed before the target battle
+- **Post-loss opportunities:** the number of prior losses after which the player could stay or switch
+- **Post-win opportunities:** the number of prior wins after which the player could stay or switch
+- **Current-deck battle count:** the total number of prior battles played with the current exact deck, including nonconsecutive uses
+
+The five count features are log-transformed before standardization. The nine
+long-term values join the 64 GRU values to produce the final 73-value player
+context used by the switch head.
