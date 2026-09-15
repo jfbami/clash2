@@ -83,18 +83,6 @@ flowchart TB
     class target,loss training;
 ```
 
-### Implementation map
-
-- Card and deck encoding: `models/card_encoder.py`
-- Battle token assembly: `models/battle_encoder.py`
-- GRU and switch head: `models/history_encoder.py`
-- Switch model: `models/switch_model.py`
-- Sequential example construction: `crdata/sequences.py`
-- Player splits and propensity folds: `crdata/switch_dataset.py`
-- OOF switch training: `scripts/train_switch_oof.py`
-
-+ more to come!!!
-
 ## Features
 
 ### Battle features
