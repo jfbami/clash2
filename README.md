@@ -12,8 +12,8 @@ this project attempts to: (measure aspects like skill) + create a recommendation
 
 ## Deck Switch Model
 
-The implemented model uses battles 1–10 to estimate whether the player will
-change their exact deck in battle 11.
+With the input of a players 10 most recent clash royale battles, this model estimate whether a given player will
+change their deck in battle 11.
 
 ```mermaid
 %%{init: {"theme":"base","flowchart":{"htmlLabels":true,"curve":"basis"},"themeVariables":{"fontFamily":"monospace","lineColor":"#3f3f46","primaryTextColor":"#27272a"}}}%%
