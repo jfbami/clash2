@@ -83,18 +83,6 @@ flowchart TB
     class target,loss training;
 ```
 
-### Implementation map
-
-- Card and deck encoding: `models/card_encoder.py`
-- Battle token assembly: `models/battle_encoder.py`
-- GRU and switch head: `models/history_encoder.py`
-- Switch model: `models/switch_model.py`
-- Sequential example construction: `crdata/sequences.py`
-- Player splits and propensity folds: `crdata/switch_dataset.py`
-- OOF switch training: `scripts/train_switch_oof.py`
-
-+ more to come!!!
-
 ## Features
 
 ### Battle features
@@ -122,5 +110,5 @@ The model receives these seven values for each of the ten battles.
 - **Current-deck battle count:** the total number of prior battles played with the current exact deck, including nonconsecutive uses
 
 The five count features are log-transformed before standardization. The nine
-long-term values join the 64 GRU values to produce the final 73-value player
-context used by the switch head.
+longterm values join the 64 GRU values to produce the final 73 value player vector 
+used by the switch head.
