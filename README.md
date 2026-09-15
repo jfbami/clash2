@@ -93,7 +93,4 @@ flowchart TB
 - Player splits and propensity folds: `crdata/switch_dataset.py`
 - OOF switch training: `scripts/train_switch_oof.py`
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the feature definitions,
-implementation map, and additional notes.
-
 + more to come!!!
