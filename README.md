@@ -10,7 +10,7 @@ this project attempts to: (measure aspects like skill) + create a recommendation
 
 `B` means batch size. The smaller line in each box shows the tensor dimension.
 
-### Switch-propensity model — built
+### Switch-propensity model, built
 
 The implemented model uses battles 1–10 to estimate whether the player will
 change their exact deck in battle 11.
@@ -81,79 +81,6 @@ flowchart TB
     class gru sequence;
     class sigmoid,prediction output;
     class target,loss training;
-```
-
-### Player-level out-of-fold propensity training — built
-
-Five copies of the model produce leakage-safe switch probabilities for the
-future outcome phase. Every player's sequences remain together in one fold.
-
-```mermaid
-%%{init: {"theme":"base","flowchart":{"htmlLabels":true,"curve":"basis"},"themeVariables":{"fontFamily":"monospace","lineColor":"#3f3f46","primaryTextColor":"#27272a"}}}%%
-flowchart TB
-    players(["Original training pool<br/><small>4,027 players · 110,419 sequences</small>"])
-    folds["Player-level five-fold split<br/><small>all sequences from one player stay together</small>"]
-
-    m0["Fold model 0<br/><small>train folds 1–4 · predict fold 0</small>"]
-    m1["Fold model 1<br/><small>train folds 0,2,3,4 · predict fold 1</small>"]
-    m2["Fold model 2<br/><small>train folds 0,1,3,4 · predict fold 2</small>"]
-    m3["Fold model 3<br/><small>train folds 0,1,2,4 · predict fold 3</small>"]
-    m4["Fold model 4<br/><small>train folds 0–3 · predict fold 4</small>"]
-
-    merge["Align held-out predictions<br/><small>B = 110,419 raw probabilities</small>"]
-    oof(["Out-of-fold switch propensity<br/><small>model never trained on predicted player</small>"])
-
-    players --> folds
-    folds --> m0
-    folds --> m1
-    folds --> m2
-    folds --> m3
-    folds --> m4
-    m0 --> merge
-    m1 --> merge
-    m2 --> merge
-    m3 --> merge
-    m4 --> merge
-    merge --> oof
-
-    classDef source fill:#eef8fc,stroke:#83b7cc,color:#27272a,stroke-width:1px;
-    classDef operation fill:#f2efff,stroke:#8b6cf6,color:#27272a,stroke-width:1px;
-    classDef output fill:#ebf8ef,stroke:#56a86c,color:#27272a,stroke-width:1px;
-
-    class players source;
-    class folds,m0,m1,m2,m3,m4,merge operation;
-    class oof output;
-```
-
-### Outcome phase — proposed, not built
-
-```mermaid
-%%{init: {"theme":"base","flowchart":{"htmlLabels":true,"curve":"basis"},"themeVariables":{"fontFamily":"monospace","lineColor":"#3f3f46","primaryTextColor":"#27272a"}}}%%
-flowchart TB
-    x(["Information before battle 11<br/><small>battles 1–10 + player context</small>"])
-    propensity["Built switch-propensity model<br/><small>e(X) = one switch probability</small>"]
-    encoder["Proposed win-outcome encoder<br/><small>representation dimension not selected</small>"]
-    stay["Proposed stay head<br/><small>mu0(X) = one win probability</small>"]
-    switchOutcome["Proposed switch head<br/><small>mu1(X) = one win probability</small>"]
-    delta["Compare outcome probabilities<br/><small>delta(X) = mu1(X) − mu0(X)</small>"]
-    policy(["Future recommendation<br/><small>stay · consider switching · insufficient evidence</small>"])
-
-    x --> propensity
-    x --> encoder
-    encoder --> stay
-    encoder --> switchOutcome
-    stay --> delta
-    switchOutcome --> delta
-    delta --> policy
-    propensity --> policy
-
-    classDef built fill:#ebf8ef,stroke:#56a86c,color:#27272a,stroke-width:1px;
-    classDef planned fill:#f2efff,stroke:#8b6cf6,color:#27272a,stroke-width:1px,stroke-dasharray:5 4;
-    classDef output fill:#fff7dc,stroke:#d5a72e,color:#27272a,stroke-width:1px,stroke-dasharray:5 4;
-
-    class x,propensity built;
-    class encoder,stay,switchOutcome,delta planned;
-    class policy output;
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the feature definitions,
