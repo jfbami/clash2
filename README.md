@@ -10,7 +10,7 @@ this project attempts to: (measure aspects like skill) + create a recommendation
 
 `B` means batch size. The smaller line in each box shows the tensor dimension.
 
-### Switch-propensity model, built
+## Deck Switch Model
 
 The implemented model uses battles 1–10 to estimate whether the player will
 change their exact deck in battle 11.
