@@ -1,126 +1,172 @@
 # Model architecture
 
-This document separates the model that is already implemented from the outcome
-and recommendation components that are still being designed.
+`B` means batch size. The smaller line inside each box is the tensor dimension
+after that operation.
 
-## Current switch-propensity model — built
+## Switch-propensity model — built
 
-The current model predicts whether the player will use a different exact deck in
-the next eligible battle. It does not predict whether switching is beneficial.
-
-The following image is traced directly from the implemented PyTorch forward pass
-using [VisualTorch](https://github.com/willyfh/visualtorch):
-
-![VisualTorch graph of the implemented switch model](architecture_assets/switch-model-visualtorch.png)
-
-The simplified data-flow view below names the domain concepts represented by
-those layers:
+This is the complete implemented path from battles 1–10 to the probability that
+the player changes their exact deck in battle 11.
 
 ```mermaid
-flowchart LR
-    cards["Card IDs<br/>B × 10 battles × 8 cards"]
-    levels["Displayed card levels<br/>B × 10 × 8"]
-    battle["Battle features<br/>B × 10 × 7"]
-    summary["Player summary features<br/>B × 9"]
+%%{init: {"theme":"base","flowchart":{"htmlLabels":true,"curve":"basis"},"themeVariables":{"fontFamily":"monospace","lineColor":"#3f3f46","primaryTextColor":"#27272a"}}}%%
+flowchart TB
+    history(["Battles 1–10<br/><small>B × 10 chronological battles</small>"])
 
-    embed["Learned card embedding<br/>24 values per card"]
-    levelstd["Standardized level<br/>1 value per card"]
-    cardmlp["Shared card MLP<br/>25 → 48 → 48"]
-    sumpool["Sum over 8 cards<br/>order-invariant deck vector"]
-    deckmlp["Deck MLP<br/>48 → 96 → 48"]
-    token["Concatenate each deck with<br/>7 battle features<br/>55-value battle token"]
-    gru["Forward GRU over 10 battles<br/>55 → 64 final history vector"]
-    fuse["Concatenate history and summary<br/>64 + 9 = 73 values"]
-    head["Switch head<br/>73 → 128 → 1 logit<br/>GELU + dropout"]
-    probability["Sigmoid<br/>P(switch deck in battle 11)"]
+    cards["Card IDs<br/><small>B × 10 × 8</small>"]
+    levels["Displayed card levels<br/><small>B × 10 × 8</small>"]
+    battleRaw["Six recorded battle features<br/><small>B × 10 × 6</small>"]
+    summaryRaw["Nine long-term player features<br/><small>B × 9</small>"]
+
+    embed["Card embedding<br/><small>B × 10 × 8 × 24</small>"]
+    levelStd["Level standardization<br/><small>B × 10 × 8 × 1</small>"]
+    cardJoin["Concatenate card information<br/><small>B × 10 × 8 × 25</small>"]
+    cardMLP["Shared card MLP + GELU<br/><small>25 → 48 → 48 per card</small>"]
+    sumPool["Sum pool over 8 cards<br/><small>B × 10 × 48</small>"]
+    deckMLP["Deck MLP + GELU<br/><small>48 → 96 → 48 per battle</small>"]
+
+    battlePrep["Standardize + trophies-missing flag<br/><small>6 recorded → 7 model features</small>"]
+    battleJoin["Concatenate deck + battle context<br/><small>48 + 7 = 55 per battle</small>"]
+    gru["One-layer forward GRU<br/><small>10 × 55 → final B × 64</small>"]
+
+    summaryPrep["Summary standardization<br/><small>B × 9</small>"]
+    contextJoin["Concatenate recent + long-term context<br/><small>64 + 9 = B × 73</small>"]
+    switchHead["Switch MLP + GELU + dropout<br/><small>73 → 128 → 1 logit</small>"]
+    sigmoid["Sigmoid<br/><small>B × 1 probability</small>"]
+    prediction(["P(switch deck in battle 11)<br/><small>one probability per sequence</small>"])
+
+    target["Observed battle-11 action<br/><small>B binary labels: stay 0 / switch 1</small>"]
+    loss["Binary cross-entropy with logits<br/><small>one training loss</small>"]
+
+    history --> cards
+    history --> levels
+    history --> battleRaw
+    history --> summaryRaw
 
     cards --> embed
-    levels --> levelstd
-    embed --> cardmlp
-    levelstd --> cardmlp
-    cardmlp --> sumpool --> deckmlp --> token
-    battle --> token
-    token --> gru --> fuse
-    summary --> fuse
-    fuse --> head --> probability
+    levels --> levelStd
+    embed --> cardJoin
+    levelStd --> cardJoin
+    cardJoin --> cardMLP --> sumPool --> deckMLP
+
+    battleRaw --> battlePrep
+    deckMLP --> battleJoin
+    battlePrep --> battleJoin
+    battleJoin --> gru
+
+    summaryRaw --> summaryPrep
+    gru --> contextJoin
+    summaryPrep --> contextJoin
+    contextJoin --> switchHead
+    switchHead --> sigmoid --> prediction
+
+    switchHead -. training .-> loss
+    target -. training .-> loss
+
+    classDef source fill:#eef8fc,stroke:#83b7cc,color:#27272a,stroke-width:1px;
+    classDef operation fill:#f2efff,stroke:#8b6cf6,color:#27272a,stroke-width:1px;
+    classDef sequence fill:#fff7dc,stroke:#d5a72e,color:#27272a,stroke-width:1px;
+    classDef output fill:#ebf8ef,stroke:#56a86c,color:#27272a,stroke-width:1px;
+    classDef training fill:#fff1e8,stroke:#d6814b,color:#27272a,stroke-width:1px;
+
+    class history,cards,levels,battleRaw,summaryRaw source;
+    class embed,levelStd,cardJoin,cardMLP,sumPool,deckMLP,battlePrep,battleJoin,summaryPrep,contextJoin,switchHead operation;
+    class gru sequence;
+    class sigmoid,prediction output;
+    class target,loss training;
 ```
 
-The seven per-battle model features are result, crown difference, deck-change
-indicator, switch magnitude, time gap, trophies, and a trophies-missing flag.
-The nine summary features describe longer-term switching behavior and current
-deck familiarity.
+The six recorded battle features are result, crown difference, changed-deck
+indicator, switch magnitude, time gap, and trophies. Preprocessing adds a seventh
+feature indicating whether trophies were missing.
 
-Sum pooling intentionally makes the eight card positions interchangeable. Card
-identity and level still affect the deck vector; only arbitrary card ordering is
-discarded.
+The nine long-term features are historical switch rate, post-loss switch rate,
+post-win switch rate, mean switch magnitude, current-deck tenure, prior battle
+count, post-loss opportunities, post-win opportunities, and total observed use
+of the current exact deck.
 
-## Leakage-safe out-of-fold training — built
+Sum pooling makes card order irrelevant, as intended for an eight-card deck. It
+does not discard card identity or level.
+
+## Player-level out-of-fold propensity training — built
+
+Five copies of the model above produce leakage-safe switch probabilities for the
+later outcome phase.
 
 ```mermaid
+%%{init: {"theme":"base","flowchart":{"htmlLabels":true,"curve":"basis"},"themeVariables":{"fontFamily":"monospace","lineColor":"#3f3f46","primaryTextColor":"#27272a"}}}%%
 flowchart TB
-    players["All original training players"]
-    split["Assign every player and all of their<br/>sequences to exactly one of 5 folds"]
-    f0["Model 0<br/>train folds 1–4<br/>predict fold 0"]
-    f1["Model 1<br/>train folds 0, 2, 3, 4<br/>predict fold 1"]
-    f2["Model 2<br/>train folds 0, 1, 3, 4<br/>predict fold 2"]
-    f3["Model 3<br/>train folds 0, 1, 2, 4<br/>predict fold 3"]
-    f4["Model 4<br/>train folds 0–3<br/>predict fold 4"]
-    oof["Combined raw OOF switch probabilities<br/>one prediction per training example<br/>from a model that never trained on that player"]
+    players(["Original training pool<br/><small>4,027 players · 110,419 sequences</small>"])
+    folds["Player-level five-fold split<br/><small>all sequences from one player stay together</small>"]
 
-    players --> split
-    split --> f0
-    split --> f1
-    split --> f2
-    split --> f3
-    split --> f4
-    f0 --> oof
-    f1 --> oof
-    f2 --> oof
-    f3 --> oof
-    f4 --> oof
+    m0["Fold model 0<br/><small>train folds 1–4 · predict fold 0</small>"]
+    m1["Fold model 1<br/><small>train folds 0,2,3,4 · predict fold 1</small>"]
+    m2["Fold model 2<br/><small>train folds 0,1,3,4 · predict fold 2</small>"]
+    m3["Fold model 3<br/><small>train folds 0,1,2,4 · predict fold 3</small>"]
+    m4["Fold model 4<br/><small>train folds 0–3 · predict fold 4</small>"]
+
+    merge["Align held-out predictions<br/><small>B = 110,419 raw probabilities</small>"]
+    oof(["Out-of-fold switch propensity<br/><small>model never trained on predicted player</small>"])
+
+    players --> folds
+    folds --> m0
+    folds --> m1
+    folds --> m2
+    folds --> m3
+    folds --> m4
+    m0 --> merge
+    m1 --> merge
+    m2 --> merge
+    m3 --> merge
+    m4 --> merge
+    merge --> oof
+
+    classDef source fill:#eef8fc,stroke:#83b7cc,color:#27272a,stroke-width:1px;
+    classDef operation fill:#f2efff,stroke:#8b6cf6,color:#27272a,stroke-width:1px;
+    classDef output fill:#ebf8ef,stroke:#56a86c,color:#27272a,stroke-width:1px;
+
+    class players source;
+    class folds,m0,m1,m2,m3,m4,merge operation;
+    class oof output;
 ```
 
-## Next outcome phase — proposed, not built
+## Outcome phase — proposed, not built
 
-The next phase would use battle-11 win/loss as the observed outcome. The diagram
-is conceptual: the exact outcome-head architecture and propensity adjustment
-have not been selected yet.
+This diagram is deliberately less specific because we have not approved its
+encoder, loss weighting, or decision thresholds.
 
 ```mermaid
-flowchart LR
-    x["Pre-battle information X<br/>battles 1–10 + player context"]
-    action["Observed action A<br/>stay = 0 or switch = 1"]
-    win["Observed outcome Y<br/>battle-11 win or loss"]
-
-    propensity["Existing frozen switch model<br/>e(X) = P(switch | X)"]
-    outcomeencoder["New win-outcome encoder<br/>architecture under discussion"]
-    stay["Stay outcome head<br/>mu0(X) = P(win if staying)"]
-    switch["Switch outcome head<br/>mu1(X) = P(win if switching)"]
-    factual["Training loss uses only the<br/>head for the observed action"]
-    compare["Estimated difference<br/>delta(X) = mu1(X) - mu0(X)"]
-    decision["Future policy<br/>stay / consider switching / insufficient evidence"]
+%%{init: {"theme":"base","flowchart":{"htmlLabels":true,"curve":"basis"},"themeVariables":{"fontFamily":"monospace","lineColor":"#3f3f46","primaryTextColor":"#27272a"}}}%%
+flowchart TB
+    x(["Information before battle 11<br/><small>battles 1–10 + player context</small>"])
+    propensity["Built switch-propensity model<br/><small>e(X) = one switch probability</small>"]
+    encoder["Proposed win-outcome encoder<br/><small>representation dimension not selected</small>"]
+    stay["Proposed stay head<br/><small>mu0(X) = one win probability</small>"]
+    switchOutcome["Proposed switch head<br/><small>mu1(X) = one win probability</small>"]
+    delta["Compare outcome probabilities<br/><small>delta(X) = mu1(X) − mu0(X)</small>"]
+    policy(["Future recommendation<br/><small>stay · consider switching · insufficient evidence</small>"])
 
     x --> propensity
-    x --> outcomeencoder
-    outcomeencoder --> stay
-    outcomeencoder --> switch
-    action --> factual
-    win --> factual
-    stay --> factual
-    switch --> factual
-    stay --> compare
-    switch --> compare
-    propensity --> decision
-    compare --> decision
+    x --> encoder
+    encoder --> stay
+    encoder --> switchOutcome
+    stay --> delta
+    switchOutcome --> delta
+    delta --> policy
+    propensity --> policy
+
+    classDef built fill:#ebf8ef,stroke:#56a86c,color:#27272a,stroke-width:1px;
+    classDef planned fill:#f2efff,stroke:#8b6cf6,color:#27272a,stroke-width:1px,stroke-dasharray:5 4;
+    classDef output fill:#fff7dc,stroke:#d5a72e,color:#27272a,stroke-width:1px,stroke-dasharray:5 4;
+
+    class x,propensity built;
+    class encoder,stay,switchOutcome,delta planned;
+    class policy output;
 ```
 
-Only the observed action and outcome are available during training. For example,
-if a player stayed and won, the stay head receives that win label; there is no
-invented label for what would have happened after switching.
-
-Because no replacement deck is specified, the proposed switch outcome means the
-average result of switching in the way similar players historically switched. It
-does not represent the effect of switching to a particular deck.
+The proposed switch outcome would represent switching in the way similar players
+historically switched. It would not represent switching to a particular named
+deck.
 
 ## Implementation map
 
