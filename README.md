@@ -110,5 +110,5 @@ The model receives these seven values for each of the ten battles.
 - **Current-deck battle count:** the total number of prior battles played with the current exact deck, including nonconsecutive uses
 
 The five count features are log-transformed before standardization. The nine
-long-term values join the 64 GRU values to produce the final 73-value player
+longterm values join the 64 GRU values to produce the final 73 value player vector
 context used by the switch head.
