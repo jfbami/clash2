@@ -7,3 +7,4 @@ scipy>=1.14
 scikit-learn>=1.5
 torch>=2.4
 matplotlib>=3.9
+visualtorch==1.4.1
