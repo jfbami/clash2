@@ -84,6 +84,16 @@ class SequenceExample:
         return self.summary_names
 
 
+@dataclass(frozen=True)
+class PreBattleContext:
+    """Model inputs available after the latest battle, before the next one."""
+
+    deck_ids: np.ndarray
+    card_levels: np.ndarray
+    battle_features: np.ndarray
+    summary_features: np.ndarray
+
+
 def jaccard_distance(deck_a: Sequence[int], deck_b: Sequence[int]) -> float:
     """Return set distance from zero for identical decks to one for disjoint decks."""
     cards_a, cards_b = set(deck_a), set(deck_b)
@@ -280,6 +290,38 @@ def build_sequence_example(
     _validate_window(history_length, window_start, len(ordered))
     return _build_sequence_example(
         ordered, history_length, window_start, summary_feature_set
+    )
+
+
+def build_prebattle_context(
+    battles: Iterable[PlayerBattle],
+    history_length: int = DEFAULT_HISTORY_LENGTH,
+    summary_feature_set: str = "current_deck_count",
+    continuity: str = "all",
+) -> PreBattleContext:
+    """Build next-battle inputs from observed battles without a target battle."""
+    ordered = _ordered_player_battles(battles)
+    _summary_names(summary_feature_set)
+    if continuity not in CONTINUITY_MODES:
+        raise ValueError(f"continuity must be one of {CONTINUITY_MODES}")
+    if history_length < 1:
+        raise ValueError("history_length must be positive")
+    if len(ordered) < history_length:
+        raise ValueError(
+            f"need at least {history_length} observed battles, received {len(ordered)}"
+        )
+    history = ordered[-history_length:]
+    if continuity == "same_collection":
+        timestamps = {battle.collected_at for battle in history}
+        if None in timestamps or len(timestamps) != 1:
+            raise ValueError("latest battles must share one collection timestamp")
+    return PreBattleContext(
+        deck_ids=np.asarray([battle.deck_ids for battle in history], dtype=np.int64),
+        card_levels=np.asarray(
+            [battle.card_levels for battle in history], dtype=np.float32
+        ),
+        battle_features=_feature_matrix(history),
+        summary_features=_summary_features(ordered, summary_feature_set),
     )
 
 
