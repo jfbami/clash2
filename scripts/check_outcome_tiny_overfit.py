@@ -207,6 +207,7 @@ def main() -> int:
         "training_accuracy": accuracy,
         "trace": trace,
     }
+    arguments.output.parent.mkdir(parents=True, exist_ok=True)
     atomic_json_dump(report, arguments.output)
     print(json.dumps({key: value for key, value in report.items() if key != "trace"}, indent=2))
     print(f"written {arguments.output}", flush=True)
